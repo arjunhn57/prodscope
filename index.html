@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ProdScope — X-ray your product. Grow faster with AI.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --primary:#4F46E5;
+  --primary-hover:#4338CA;
+  --primary-light:#EEF2FF;
+  --primary-glow:rgba(79,70,229,0.15);
+  --dark:#0B0F1A;
+  --dark-2:#141927;
+  --gray-50:#F8FAFC;
+  --gray-100:#F1F5F9;
+  --gray-200:#E2E8F0;
+  --gray-300:#CBD5E1;
+  --gray-400:#94A3B8;
+  --gray-500:#64748B;
+  --gray-600:#475569;
+  --gray-700:#334155;
+  --gray-800:#1E293B;
+  --gray-900:#0F172A;
+  --white:#FFFFFF;
+  --green:#10B981;
+  --green-light:#ECFDF5;
+  --orange:#F59E0B;
+  --red:#EF4444;
+  --radius:12px;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--gray-900);background:var(--white);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;}
+a{text-decoration:none;color:inherit;}
+img{max-width:100%;}
+
+/* ═══════ NAV ═══════ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 32px;transition:all 0.3s;}
+.nav.scrolled{background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--gray-200);}
+.nav.mobile-solid{background:var(--white);border-bottom:1px solid var(--gray-200);}
+.nav-inner{max-width:1200px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;}
+.nav-logo{display:flex;align-items:center;gap:10px;}
+.nav-logo-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#4F46E5,#7C3AED);display:flex;align-items:center;justify-content:center;}
+.nav-logo-mark svg{width:18px;height:18px;}
+.nav-logo-text{font-size:17px;font-weight:800;letter-spacing:-0.4px;color:var(--gray-900);}
+.nav.scrolled .nav-logo-text{color:var(--gray-900);}
+.nav-links{display:flex;align-items:center;gap:32px;}
+.nav-link{font-size:14px;font-weight:500;color:var(--gray-500);transition:color 0.2s;}
+.nav-link:hover{color:var(--gray-900);}
+.nav-cta{font-size:13.5px;font-weight:600;padding:8px 20px;background:var(--primary);color:#fff;border-radius:8px;transition:all 0.2s;border:none;cursor:pointer;white-space:nowrap;}
+.nav-cta:hover{background:var(--primary-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(79,70,229,0.3);}
+.nav-menu-btn{display:none;background:none;border:none;cursor:pointer;padding:6px;color:var(--gray-700);}
+
+/* ═══════ HERO ═══════ */
+.hero{padding:140px 32px 80px;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;top:-200px;right:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(79,70,229,0.06) 0%,transparent 70%);pointer-events:none;}
+.hero::after{content:'';position:absolute;bottom:-100px;left:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(124,58,237,0.04) 0%,transparent 70%);pointer-events:none;}
+.hero-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;background:var(--primary-light);border:1px solid #C7D2FE;border-radius:100px;margin-bottom:20px;font-size:12.5px;font-weight:600;color:var(--primary);}
+.hero-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse-dot 2s ease infinite;}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{box-shadow:0 0 0 6px rgba(16,185,129,0);}}
+.hero h1{font-size:52px;font-weight:800;line-height:1.08;letter-spacing:-1.5px;margin-bottom:20px;color:var(--gray-900);}
+.hero h1 span{background:linear-gradient(135deg,#4F46E5,#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{font-size:17px;line-height:1.7;color:var(--gray-500);margin-bottom:32px;max-width:480px;}
+.hero-actions{display:flex;gap:12px;align-items:center;margin-bottom:36px;}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:var(--primary);color:#fff;font-family:inherit;font-size:15px;font-weight:600;border:none;border-radius:10px;cursor:pointer;transition:all 0.25s;box-shadow:0 2px 8px rgba(79,70,229,0.25);}
+.btn-primary:hover{background:var(--primary-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(79,70,229,0.3);}
+.btn-primary svg{width:18px;height:18px;}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:var(--white);color:var(--gray-700);font-family:inherit;font-size:15px;font-weight:600;border:1px solid var(--gray-200);border-radius:10px;cursor:pointer;transition:all 0.25s;}
+.btn-secondary:hover{background:var(--gray-50);border-color:var(--gray-300);transform:translateY(-1px);}
+.btn-secondary svg{width:16px;height:16px;}
+.hero-proof{display:flex;gap:28px;font-size:13px;color:var(--gray-400);font-weight:500;}
+.hero-proof span{display:flex;align-items:center;gap:6px;}
+.hero-proof svg{width:14px;height:14px;color:var(--green);}
+
+/* HERO VISUAL */
+.hero-visual{position:relative;}
+.hero-card{background:var(--white);border:1px solid var(--gray-200);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.04);overflow:hidden;transform:perspective(1000px) rotateY(-2deg) rotateX(1deg);transition:transform 0.5s;}
+.hero-card:hover{transform:perspective(1000px) rotateY(0) rotateX(0);}
+.hc-top{padding:10px 14px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:6px;}
+.hc-dot{width:7px;height:7px;border-radius:50%;}
+.hc-dot-r{background:#EF4444;}
+.hc-dot-y{background:#F59E0B;}
+.hc-dot-g{background:#10B981;}
+.hc-top-title{margin-left:8px;font-size:11.5px;font-weight:600;color:var(--gray-400);font-family:'JetBrains Mono',monospace;}
+.hc-body{padding:20px;}
+.hc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;}
+.hc-app{display:flex;align-items:center;gap:10px;min-width:0;}
+.hc-app-icon{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hc-app-icon svg{width:18px;height:18px;color:#fff;}
+.hc-app-name{font-size:14px;font-weight:700;letter-spacing:-0.3px;}
+.hc-app-cat{font-size:10.5px;color:var(--gray-400);font-family:'JetBrains Mono',monospace;}
+.hc-score{text-align:center;flex-shrink:0;}
+.hc-score-num{font-size:26px;font-weight:800;color:var(--green);letter-spacing:-1px;}
+.hc-score-lbl{font-size:8px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;}
+.hc-metrics{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;}
+.hc-m{padding:10px 8px;background:var(--gray-50);border-radius:7px;text-align:center;border:1px solid var(--gray-100);}
+.hc-m-v{font-size:14px;font-weight:800;color:var(--primary);letter-spacing:-0.3px;}
+.hc-m-l{font-size:8px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;font-weight:600;}
+.hc-items{display:flex;flex-direction:column;gap:6px;}
+.hc-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gray-50);border-radius:7px;font-size:11.5px;font-weight:600;color:var(--gray-700);border:1px solid var(--gray-100);}
+.hc-item-sev{font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.hc-item-sev.crit{background:#FEF2F2;color:#EF4444;}
+.hc-item-sev.warn{background:#FFFBEB;color:#D97706;}
+
+.float-badge{position:absolute;padding:8px 14px;background:var(--white);border:1px solid var(--gray-200);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.06);font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;animation:float 4s ease-in-out infinite;z-index:2;}
+.fb-1{top:20px;right:-20px;animation-delay:0s;}
+.fb-2{bottom:40px;left:-30px;animation-delay:1.5s;}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.fb-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.fb-i-green{background:var(--green-light);}
+.fb-i-primary{background:var(--primary-light);}
+
+/* ═══════ LOGOS ═══════ */
+.logos{padding:40px 32px 60px;text-align:center;}
+.logos-inner{max-width:900px;margin:0 auto;}
+.logos-label{font-size:12px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:28px;}
+.logos-grid{display:flex;align-items:center;justify-content:center;gap:48px;flex-wrap:wrap;opacity:0.35;}
+.logos-grid span{font-size:18px;font-weight:800;color:var(--gray-500);letter-spacing:-0.3px;}
+
+/* ═══════ HOW IT WORKS ═══════ */
+.how{padding:80px 32px;background:var(--gray-50);position:relative;}
+.how::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gray-200),transparent);}
+.how-inner{max-width:1000px;margin:0 auto;}
+.section-eyebrow{font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;text-align:center;}
+.section-title{font-size:36px;font-weight:800;letter-spacing:-1px;text-align:center;margin-bottom:16px;color:var(--gray-900);}
+.section-sub{font-size:16px;color:var(--gray-500);text-align:center;max-width:540px;margin:0 auto 56px;line-height:1.65;}
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;position:relative;}
+.steps::before{content:'';position:absolute;top:36px;left:calc(16.66% + 24px);right:calc(16.66% + 24px);height:2px;background:linear-gradient(90deg,var(--primary),#7C3AED,var(--primary));opacity:0.2;}
+.step{text-align:center;padding:0 28px;position:relative;}
+.step-num{width:48px;height:48px;border-radius:14px;background:var(--white);border:2px solid var(--gray-200);display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--primary);margin-bottom:20px;position:relative;z-index:1;transition:all 0.3s;}
+.step:hover .step-num{background:var(--primary);color:#fff;border-color:var(--primary);transform:scale(1.08);box-shadow:0 4px 16px rgba(79,70,229,0.25);}
+.step-title{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-0.3px;}
+.step-desc{font-size:14px;color:var(--gray-500);line-height:1.6;}
+
+/* ═══════ FEATURES ═══════ */
+.features{padding:100px 32px;}
+.features-inner{max-width:1100px;margin:0 auto;}
+.feat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+.feat-card{padding:28px 24px;background:var(--white);border:1px solid var(--gray-200);border-radius:14px;transition:all 0.3s;cursor:default;}
+.feat-card:hover{border-color:var(--primary);box-shadow:0 8px 30px rgba(79,70,229,0.08);transform:translateY(-4px);}
+.feat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+.feat-icon svg{width:22px;height:22px;}
+.fi-red{background:#FEF2F2;color:#EF4444;}
+.fi-blue{background:var(--primary-light);color:var(--primary);}
+.fi-green{background:var(--green-light);color:var(--green);}
+.fi-orange{background:#FFFBEB;color:#F59E0B;}
+.fi-purple{background:#F5F3FF;color:#8B5CF6;}
+.fi-teal{background:#F0FDFA;color:#14B8A6;}
+.feat-title{font-size:16px;font-weight:700;margin-bottom:6px;letter-spacing:-0.2px;}
+.feat-desc{font-size:13.5px;color:var(--gray-500);line-height:1.6;}
+
+/* ═══════ STATS ═══════ */
+.stats{padding:60px 32px;background:var(--dark);position:relative;overflow:hidden;}
+.stats::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(79,70,229,0.2) 0%,transparent 70%);pointer-events:none;}
+.stats-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:32px;text-align:center;position:relative;z-index:1;}
+.stat-num{font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:4px;}
+.stat-num span{background:linear-gradient(135deg,#818CF8,#C084FC);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-label{font-size:13px;color:var(--gray-400);font-weight:500;}
+
+/* ═══════ AUDIENCE ═══════ */
+.audience{padding:100px 32px;background:var(--gray-50);}
+.audience-inner{max-width:1100px;margin:0 auto;}
+.aud-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+.aud-card{padding:32px 28px;background:var(--white);border:1px solid var(--gray-200);border-radius:14px;transition:all 0.3s;position:relative;overflow:hidden;}
+.aud-card:hover{border-color:var(--primary);box-shadow:0 8px 30px rgba(79,70,229,0.08);}
+.aud-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),#7C3AED);opacity:0;transition:opacity 0.3s;}
+.aud-card:hover::before{opacity:1;}
+.aud-icon{width:48px;height:48px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;margin-bottom:18px;}
+.aud-icon svg{width:24px;height:24px;color:var(--primary);}
+.aud-title{font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-0.3px;}
+.aud-desc{font-size:14px;color:var(--gray-500);line-height:1.65;margin-bottom:16px;}
+.aud-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+.aud-list li{font-size:13px;color:var(--gray-600);display:flex;align-items:center;gap:8px;font-weight:500;}
+.aud-list li svg{width:14px;height:14px;color:var(--green);flex-shrink:0;}
+
+/* ═══════ PRICING ═══════ */
+.pricing{padding:100px 32px;}
+.pricing-inner{max-width:1000px;margin:0 auto;}
+.price-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+.price-card{padding:32px 28px;background:var(--white);border:1px solid var(--gray-200);border-radius:14px;transition:all 0.3s;position:relative;}
+.price-card:hover{border-color:var(--gray-300);box-shadow:0 8px 30px rgba(0,0,0,0.06);}
+.price-card.popular{border-color:var(--primary);box-shadow:0 8px 30px rgba(79,70,229,0.12);}
+.price-pop-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 14px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;border-radius:100px;letter-spacing:0.3px;white-space:nowrap;}
+.price-name{font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:-0.1px;}
+.price-desc{font-size:13px;color:var(--gray-400);margin-bottom:20px;}
+.price-amount{font-size:42px;font-weight:800;letter-spacing:-1.5px;margin-bottom:4px;}
+.price-amount span{font-size:15px;font-weight:500;color:var(--gray-400);letter-spacing:0;}
+.price-period{font-size:12px;color:var(--gray-400);margin-bottom:24px;}
+.price-btn{display:block;width:100%;padding:11px 0;text-align:center;border-radius:9px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;border:none;margin-bottom:24px;}
+.price-btn-primary{background:var(--primary);color:#fff;}
+.price-btn-primary:hover{background:var(--primary-hover);box-shadow:0 4px 12px rgba(79,70,229,0.25);}
+.price-btn-outline{background:var(--white);color:var(--gray-700);border:1px solid var(--gray-200);}
+.price-btn-outline:hover{background:var(--gray-50);border-color:var(--gray-300);}
+.price-features{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.price-features li{font-size:13px;color:var(--gray-600);display:flex;align-items:center;gap:8px;font-weight:500;}
+.price-features li svg{width:14px;height:14px;color:var(--green);flex-shrink:0;}
+
+/* ═══════ TESTIMONIALS ═══════ */
+.testimonials{padding:100px 32px;background:var(--gray-50);}
+.testimonials-inner{max-width:1100px;margin:0 auto;}
+.test-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+.test-card{padding:28px 24px;background:var(--white);border:1px solid var(--gray-200);border-radius:14px;}
+.test-stars{display:flex;gap:2px;margin-bottom:14px;color:var(--orange);}
+.test-text{font-size:14px;color:var(--gray-600);line-height:1.7;margin-bottom:18px;font-style:italic;}
+.test-author{display:flex;align-items:center;gap:10px;}
+.test-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;}
+.ta-1{background:linear-gradient(135deg,#6366F1,#8B5CF6);}
+.ta-2{background:linear-gradient(135deg,#14B8A6,#06B6D4);}
+.ta-3{background:linear-gradient(135deg,#F59E0B,#EF4444);}
+.test-name{font-size:13px;font-weight:700;letter-spacing:-0.1px;}
+.test-role{font-size:11.5px;color:var(--gray-400);}
+
+/* ═══════ CTA ═══════ */
+.cta-band{padding:80px 32px;background:var(--dark);position:relative;overflow:hidden;text-align:center;}
+.cta-band::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:400px;background:radial-gradient(ellipse,rgba(79,70,229,0.15) 0%,transparent 70%);pointer-events:none;}
+.cta-inner{max-width:600px;margin:0 auto;position:relative;z-index:1;}
+.cta-band h2{font-size:34px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:14px;}
+.cta-band p{font-size:16px;color:var(--gray-400);margin-bottom:32px;line-height:1.6;}
+.cta-band .btn-primary{padding:14px 32px;font-size:16px;box-shadow:0 4px 20px rgba(79,70,229,0.35);}
+
+/* ═══════ FOOTER ═══════ */
+.footer{padding:48px 32px 32px;border-top:1px solid var(--gray-200);}
+.footer-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;}
+.footer-left{display:flex;align-items:center;gap:10px;}
+.footer-logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4F46E5,#7C3AED);display:flex;align-items:center;justify-content:center;}
+.footer-logo svg{width:14px;height:14px;}
+.footer-brand{font-size:14px;font-weight:700;letter-spacing:-0.2px;}
+.footer-copy{font-size:12.5px;color:var(--gray-400);}
+.footer-links{display:flex;gap:24px;}
+.footer-links a{font-size:13px;color:var(--gray-500);font-weight:500;transition:color 0.2s;}
+.footer-links a:hover{color:var(--gray-900);}
+
+/* ═══════ ANIMATIONS ═══════ */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.reveal-d1{transition-delay:0.1s;}
+.reveal-d2{transition-delay:0.2s;}
+.reveal-d3{transition-delay:0.3s;}
+
+/* ═══════ MOBILE ═══════ */
+@media(max-width:900px){
+  .nav{padding:0 20px;}
+  .nav-inner{height:56px;}
+  .nav-links{
+    display:none;
+    position:absolute;top:56px;left:0;right:0;
+    flex-direction:column;gap:0;
+    background:var(--white);border-bottom:1px solid var(--gray-200);
+    box-shadow:0 12px 32px rgba(0,0,0,0.08);
+    padding:8px 16px 16px;
+  }
+  .nav-links.show-mobile{display:flex;}
+  .nav-link{padding:12px 8px;font-size:15px;border-bottom:1px solid var(--gray-100);}
+  .nav-cta{margin-top:8px;text-align:center;padding:12px 20px;font-size:14px;display:block;}
+  .nav-menu-btn{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;}
+  .nav-menu-btn:active{background:var(--gray-100);}
+  .hero-inner{grid-template-columns:1fr;gap:32px;}
+  .hero-visual{order:-1;max-width:420px;margin:0 auto;width:100%;}
+  .hero-card{transform:none;}
+  .hero h1{font-size:34px;}
+  .hero-sub{font-size:15px;}
+  .feat-grid,.aud-grid,.price-grid,.test-grid{grid-template-columns:1fr;}
+  .steps{grid-template-columns:1fr;gap:32px;}
+  .stats-inner{grid-template-columns:1fr 1fr;gap:24px;}
+  .float-badge{display:none;}
+  .steps::before{display:none;}
+  .hero{padding:80px 20px 60px;}
+  .section-title{font-size:30px;}
+  .section-sub{font-size:14.5px;margin-bottom:40px;}
+  .how,.features,.audience,.pricing,.testimonials{padding:60px 20px;}
+  .logos{padding:30px 20px 40px;}
+  .stats{padding:48px 20px;}
+  .cta-band{padding:60px 20px;}
+  .footer{padding:36px 20px 28px;}
+}
+@media(max-width:600px){
+  .hero{padding:72px 16px 48px;}
+  .hero h1{font-size:28px;letter-spacing:-1px;}
+  .hero-sub{font-size:14px;}
+  .hero-actions{flex-direction:column;align-items:stretch;}
+  .btn-primary,.btn-secondary{justify-content:center;padding:12px 20px;}
+  .hero-proof{flex-direction:column;gap:8px;}
+  .hero-visual{max-width:100%;}
+  .hc-body{padding:14px;}
+  .hc-header{gap:8px;}
+  .hc-app-icon{width:32px;height:32px;border-radius:8px;}
+  .hc-app-icon svg{width:16px;height:16px;}
+  .hc-app-name{font-size:13px;}
+  .hc-app-cat{font-size:9.5px;}
+  .hc-score-num{font-size:22px;}
+  .hc-metrics{grid-template-columns:1fr 1fr;gap:6px;}
+  .hc-m{padding:8px 6px;}
+  .hc-m-v{font-size:13px;}
+  .hc-m-l{font-size:7px;}
+  .hc-item{font-size:11px;padding:7px 9px;gap:6px;}
+  .hc-item-sev{font-size:8px;padding:2px 6px;}
+  .hc-top{padding:10px 14px;}
+  .hc-top-title{font-size:10px;}
+  .stats-inner{grid-template-columns:1fr 1fr;gap:16px;}
+  .stat-num{font-size:28px;}
+  .section-title{font-size:24px;}
+  .section-sub{font-size:13.5px;}
+  .nav{padding:0 16px;}
+  .footer-inner{flex-direction:column;gap:16px;text-align:center;}
+  .footer-links{flex-wrap:wrap;justify-content:center;gap:16px;}
+  .step{padding:0 12px;}
+  .feat-card,.aud-card,.price-card,.test-card{padding:22px 18px;}
+  .logos-grid{gap:24px;}
+  .logos-grid span{font-size:15px;}
+}
+@media(max-width:380px){
+  .hero h1{font-size:24px;}
+  .hc-metrics{gap:4px;}
+  .hc-m{padding:6px 4px;}
+  .hc-m-v{font-size:12px;}
+  .hc-m-l{font-size:6.5px;}
+  .nav-logo-text{font-size:15px;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" id="mainNav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg></div>
+      <span class="nav-logo-text">ProdScope</span>
+    </a>
+    <div class="nav-links">
+      <a href="#how" class="nav-link">How it Works</a>
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#pricing" class="nav-link">Pricing</a>
+      <a href="app.html" class="nav-cta">Start Free Analysis</a>
+    </div>
+    <button class="nav-menu-btn" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Powered by Claude AI
+      </div>
+      <h1>X-ray your product.<br/><span>Grow faster</span> with AI.</h1>
+      <p class="hero-sub">Upload any app build or paste a URL — get a full intelligence report with critical fixes, growth roadmap, competitor gaps, and ASO keywords in 15 seconds. No SDK needed.</p>
+      <div class="hero-actions">
+        <a href="app.html" class="btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Start Free Analysis
+        </a>
+        <a href="#how" class="btn-secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+          See How It Works
+        </a>
+      </div>
+      <div class="hero-proof">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>15-second analysis</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>50+ signals scanned</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>No SDK required</span>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="float-badge fb-1">
+        <div class="fb-icon fb-i-green">⚡</div>
+        <div><div style="font-size:11px;font-weight:700;color:var(--green)">Score: 87/100</div><div style="font-size:10px;color:var(--gray-400)">Strong product</div></div>
+      </div>
+      <div class="float-badge fb-2">
+        <div class="fb-icon fb-i-primary">🔍</div>
+        <div><div style="font-size:11px;font-weight:700;color:var(--primary)">3 Critical Fixes</div><div style="font-size:10px;color:var(--gray-400)">Found by AI</div></div>
+      </div>
+      <div class="hero-card">
+        <div class="hc-top">
+          <span class="hc-dot hc-dot-r"></span>
+          <span class="hc-dot hc-dot-y"></span>
+          <span class="hc-dot hc-dot-g"></span>
+          <span class="hc-top-title">prodscope — analysis</span>
+        </div>
+        <div class="hc-body">
+          <div class="hc-header">
+            <div class="hc-app">
+              <div class="hc-app-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></div>
+              <div><div class="hc-app-name">FinTrack Pro</div><div class="hc-app-cat">finance · ios · global</div></div>
+            </div>
+            <div class="hc-score"><div class="hc-score-num">87</div><div class="hc-score-lbl">Health Score</div></div>
+          </div>
+          <div class="hc-metrics">
+            <div class="hc-m"><div class="hc-m-v">8.4</div><div class="hc-m-l">UX Score</div></div>
+            <div class="hc-m"><div class="hc-m-v">72%</div><div class="hc-m-l">Retention</div></div>
+            <div class="hc-m"><div class="hc-m-v">7.1</div><div class="hc-m-l">Onboard</div></div>
+            <div class="hc-m"><div class="hc-m-v">6.8</div><div class="hc-m-l">Monetize</div></div>
+          </div>
+          <div class="hc-items">
+            <div class="hc-item"><span class="hc-item-sev crit">critical</span>Onboarding drop-off at step 3</div>
+            <div class="hc-item"><span class="hc-item-sev warn">warning</span>Missing biometric auth option</div>
+            <div class="hc-item"><span class="hc-item-sev warn">warning</span>No dark mode support detected</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS -->
+<section class="logos reveal">
+  <div class="logos-inner">
+    <div class="logos-label">Built for teams who ship fast</div>
+    <div class="logos-grid">
+      <span>Flipkart</span>
+      <span>Razorpay</span>
+      <span>Zerodha</span>
+      <span>Swiggy</span>
+      <span>PhonePe</span>
+      <span>CRED</span>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="how-inner">
+    <div class="section-eyebrow">How it works</div>
+    <h2 class="section-title">Three steps to product clarity</h2>
+    <p class="section-sub">No SDK integration, no user data needed. Works on any app or website from day zero.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <h3 class="step-title">Upload or paste</h3>
+        <p class="step-desc">Drop an APK, IPA, or AAB file — or paste any website URL or store listing link.</p>
+      </div>
+      <div class="step reveal reveal-d1">
+        <div class="step-num">02</div>
+        <h3 class="step-title">AI analyzes</h3>
+        <p class="step-desc">Claude AI scans 50+ product signals including UX patterns, growth levers, and competitor gaps.</p>
+      </div>
+      <div class="step reveal reveal-d2">
+        <div class="step-num">03</div>
+        <h3 class="step-title">Get your report</h3>
+        <p class="step-desc">Receive a full actionable report with critical fixes, USP ideas, growth roadmap, and ASO keywords.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="features-inner">
+    <div class="section-eyebrow">Features</div>
+    <h2 class="section-title">Everything you need to outgrow competitors</h2>
+    <p class="section-sub">A complete product intelligence suite — powered by AI, delivered in seconds.</p>
+    <div class="feat-grid">
+      <div class="feat-card reveal">
+        <div class="feat-icon fi-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <h3 class="feat-title">Critical Fix Detection</h3>
+        <p class="feat-desc">AI identifies the top UX issues, crashes, and friction points killing your retention and ratings.</p>
+      </div>
+      <div class="feat-card reveal reveal-d1">
+        <div class="feat-icon fi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <h3 class="feat-title">New USP Ideas</h3>
+        <p class="feat-desc">Discover untapped features and differentiators that your competitors haven't thought of yet.</p>
+      </div>
+      <div class="feat-card reveal reveal-d2">
+        <div class="feat-icon fi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <h3 class="feat-title">Growth Roadmap</h3>
+        <p class="feat-desc">A prioritized 5-step action plan with effort estimates and timeframes to scale your product.</p>
+      </div>
+      <div class="feat-card reveal">
+        <div class="feat-icon fi-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
+        <h3 class="feat-title">Competitor Landscape</h3>
+        <p class="feat-desc">See where your competitors are strong and where you can beat them — with data-backed gaps.</p>
+      </div>
+      <div class="feat-card reveal reveal-d1">
+        <div class="feat-icon fi-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></div>
+        <h3 class="feat-title">ASO & SEO Keywords</h3>
+        <p class="feat-desc">Get keyword recommendations with strength ratings to boost your discoverability in stores and search.</p>
+      </div>
+      <div class="feat-card reveal reveal-d2">
+        <div class="feat-icon fi-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3 class="feat-title">No SDK Required</h3>
+        <p class="feat-desc">Works instantly on any product — no code changes, no integration, no user data collection needed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="stats-inner">
+    <div><div class="stat-num"><span>15s</span></div><div class="stat-label">Average analysis time</div></div>
+    <div><div class="stat-num"><span>50+</span></div><div class="stat-label">Product signals scanned</div></div>
+    <div><div class="stat-num"><span>92%</span></div><div class="stat-label">Actionable insights</div></div>
+    <div><div class="stat-num"><span>$0</span></div><div class="stat-label">First analysis free</div></div>
+  </div>
+</section>
+
+<!-- AUDIENCE -->
+<section class="audience" id="audience">
+  <div class="audience-inner">
+    <div class="section-eyebrow">Who it's for</div>
+    <h2 class="section-title">Built for every product role</h2>
+    <p class="section-sub">Whether you're shipping features, catching bugs, or planning roadmaps.</p>
+    <div class="aud-grid">
+      <div class="aud-card reveal">
+        <div class="aud-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+        <h3 class="aud-title">Developers</h3>
+        <p class="aud-desc">Run an AI audit before every release. Catch UX issues and get data-backed improvement ideas.</p>
+        <ul class="aud-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pre-release quality checks</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Feature prioritization data</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>APK/IPA direct analysis</li>
+        </ul>
+      </div>
+      <div class="aud-card reveal reveal-d1">
+        <div class="aud-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+        <h3 class="aud-title">QA Engineers</h3>
+        <p class="aud-desc">Automated UX regression detection. Never ship a broken experience again.</p>
+        <ul class="aud-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>UX regression scanning</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Severity-tagged issues</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Shareable audit reports</li>
+        </ul>
+      </div>
+      <div class="aud-card reveal reveal-d2">
+        <div class="aud-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg></div>
+        <h3 class="aud-title">Product Managers</h3>
+        <p class="aud-desc">Competitor intelligence, growth maps, and data to back your next product decision.</p>
+        <ul class="aud-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Competitor gap analysis</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Growth opportunity maps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Stakeholder-ready reports</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="section-eyebrow">Pricing</div>
+    <h2 class="section-title">Simple, transparent pricing</h2>
+    <p class="section-sub">Start free. Scale as your product grows.</p>
+    <div class="price-grid">
+      <div class="price-card reveal">
+        <div class="price-name">Starter</div>
+        <div class="price-desc">For solo developers</div>
+        <div class="price-amount">$29<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <button class="price-btn price-btn-outline" onclick="location.href='app.html'">Get Started</button>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>5 analyses per month</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Full AI reports</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>ASO & SEO keywords</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>PDF export</li>
+        </ul>
+      </div>
+      <div class="price-card popular reveal reveal-d1">
+        <div class="price-pop-badge">Most Popular</div>
+        <div class="price-name">Pro</div>
+        <div class="price-desc">For growing startups</div>
+        <div class="price-amount">$99<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <button class="price-btn price-btn-primary" onclick="location.href='app.html'">Start Free Trial</button>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Unlimited analyses</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Competitor landscape</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Growth roadmaps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Priority support</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Shareable links</li>
+        </ul>
+      </div>
+      <div class="price-card reveal reveal-d2">
+        <div class="price-name">Agency</div>
+        <div class="price-desc">For teams & agencies</div>
+        <div class="price-amount">$299<span>/mo</span></div>
+        <div class="price-period">Billed monthly</div>
+        <button class="price-btn price-btn-outline" onclick="location.href='app.html'">Contact Sales</button>
+        <ul class="price-features">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Pro</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>White-label reports</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>API access</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Dedicated support</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>CI/CD integration</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+  <div class="testimonials-inner">
+    <div class="section-eyebrow">Testimonials</div>
+    <h2 class="section-title">Loved by product teams</h2>
+    <p class="section-sub">See what builders are saying about ProdScope.</p>
+    <div class="test-grid">
+      <div class="test-card reveal">
+        <div class="test-stars"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <p class="test-text">"ProdScope found 3 critical UX issues we'd missed for months. The growth roadmap alone was worth the subscription — saved us weeks of planning."</p>
+        <div class="test-author"><div class="test-avatar ta-1">RK</div><div><div class="test-name">Rohit Kumar</div><div class="test-role">CTO, FinLeap</div></div></div>
+      </div>
+      <div class="test-card reveal reveal-d1">
+        <div class="test-stars"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <p class="test-text">"We use ProdScope on every client app before handover. The competitor analysis and ASO keywords have become part of our standard delivery."</p>
+        <div class="test-author"><div class="test-avatar ta-2">SP</div><div><div class="test-name">Sneha Patel</div><div class="test-role">Head of Product, AppCraft Agency</div></div></div>
+      </div>
+      <div class="test-card reveal reveal-d2">
+        <div class="test-stars"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <p class="test-text">"As a solo dev, this replaced my $2,000/month consultant. The AI catches things I'd never think of. Absolutely essential for any indie developer."</p>
+        <div class="test-author"><div class="test-avatar ta-3">AM</div><div><div class="test-name">Arjun Mehta</div><div class="test-role">Indie Developer</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-band">
+  <div class="cta-inner">
+    <h2>Ready to x-ray your product?</h2>
+    <p>Your first analysis is completely free. No credit card required. Get actionable insights in under 15 seconds.</p>
+    <a href="app.html" class="btn-primary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      Start Your Free Analysis
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-left">
+      <div class="footer-logo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <span class="footer-brand">ProdScope</span>
+      <span class="footer-copy">© 2025 ProdScope. All rights reserved.</span>
+    </div>
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Contact</a>
+      <a href="#">Twitter</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Nav scroll effect
+const nav=document.getElementById('mainNav');
+const navLinks=document.querySelector('.nav-links');
+
+function checkMobile(){
+  if(window.innerWidth<=900){
+    nav.classList.add('mobile-solid');
+  } else {
+    nav.classList.remove('mobile-solid');
+    navLinks.classList.remove('show-mobile');
+  }
+}
+checkMobile();
+window.addEventListener('resize',checkMobile);
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>20);});
+
+// Mobile menu toggle
+document.querySelector('.nav-menu-btn').addEventListener('click',function(){
+  navLinks.classList.toggle('show-mobile');
+});
+
+// Close mobile menu when a link is clicked
+document.querySelectorAll('.nav-link, .nav-cta').forEach(link=>{
+  link.addEventListener('click',()=>{navLinks.classList.remove('show-mobile');});
+});
+
+// Scroll reveal
+const reveals=document.querySelectorAll('.reveal');
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}});
+},{threshold:0.15,rootMargin:'0px 0px -40px 0px'});
+reveals.forEach(r=>observer.observe(r));
+</script>
+</body>
+</html>
