@@ -197,6 +197,31 @@ svg{flex-shrink:0;}
   .main{margin-left:0;}.hamburger{display:block;}.fg{grid-template-columns:1fr;}.rg{grid-template-columns:1fr;}
   .page-content{padding:18px 16px 60px;}.action-row{flex-direction:column;align-items:stretch;}.analyze-btn{justify-content:center;}.res-hcard{flex-direction:column;}
 }
+
+/* ═══════════════ PRINT / PDF ═══════════════ */
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
+  body{background:#fff !important;font-size:12px;}
+  .sidebar,.topbar,.sb-overlay,.loading-overlay,.hamburger{display:none !important;}
+  .main{margin-left:0 !important;}
+  .page-content{padding:0 !important;max-width:100% !important;}
+  .page-title,.page-sub,.card:not(.print-show){display:none !important;}
+  #results{display:block !important;}
+  .res-hcard{box-shadow:none !important;border:1px solid #E2E4ED !important;break-inside:avoid;}
+  .res-hcard::before{display:none !important;}
+  .rc{box-shadow:none !important;border:1px solid #E2E4ED !important;animation:none !important;opacity:1 !important;transform:none !important;break-inside:avoid;margin-bottom:12px;}
+  .rg{gap:12px !important;}
+  .reset-btn,.pdf-btn{display:none !important;}
+  .print-header{display:flex !important;}
+  @page{margin:0.6in;size:A4;}
+}
+.print-header{display:none;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid var(--accent);}
+.print-logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4F46E5,#7C3AED);display:flex;align-items:center;justify-content:center;}
+.print-brand{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.3px;}
+.print-date{margin-left:auto;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;}
+.pdf-btn{display:flex;align-items:center;gap:6px;padding:7px 17px;background:var(--white);border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.2s;}
+.pdf-btn svg{width:14px;height:14px;}
+.pdf-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
 </style>
 </head>
 <body>
@@ -375,7 +400,8 @@ async function startAnalysis(){
 function renderResults(d,name,category,platform){
   const sc=d.overallScore,color=sc>=80?'#10B981':sc>=60?'#F59E0B':'#EF4444',circ=2*Math.PI*33,off=circ-(sc/100)*circ;
   const svgBolt='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:11px;color:var(--green);font-family:JetBrains Mono,monospace;font-weight:600;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green)"></span>Analysis complete</span><button class="reset-btn" onclick="document.getElementById(\'results\').style.display=\'none\';window.scrollTo({top:0,behavior:\'smooth\'})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>New Analysis</button></div>';
+  let h='<div class="print-header"><div class="print-logo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><div class="print-brand">ProdScope</div><div class="print-date">Report generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</div></div>';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:11px;color:var(--green);font-family:JetBrains Mono,monospace;font-weight:600;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green)"></span>Analysis complete</span><div style="display:flex;gap:8px"><button class="pdf-btn" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export PDF</button><button class="reset-btn" onclick="document.getElementById(\'results\').style.display=\'none\';window.scrollTo({top:0,behavior:\'smooth\'})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>New Analysis</button></div></div>';
   h+='<div class="res-hcard"><div><div class="res-name">'+name+'</div><div class="res-meta">'+category+' · '+platform+' · '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div><div class="res-summary">'+d.appSummary+'</div></div><div class="score-wrap"><div class="score-circ"><svg viewBox="0 0 76 76"><circle class="sc-bg" cx="38" cy="38" r="33"/><circle class="sc-fill" cx="38" cy="38" r="33" stroke="'+color+'" stroke-dasharray="'+circ+'" stroke-dashoffset="'+off+'"/></svg><div class="sc-inner"><div class="sc-num" style="color:'+color+'">'+sc+'</div><div class="sc-lbl">/100</div></div></div><div style="font-size:11px;font-weight:700;color:'+color+';font-family:JetBrains Mono,monospace">'+d.scoreLabel+'</div></div></div>';
   if(d.quickWins&&d.quickWins.length){h+='<div class="rc" style="margin-bottom:16px;animation-delay:0.05s"><div class="rc-head"><div class="rc-hi chi-green">'+svgBolt+'</div><div><div class="rc-ht">Quick Wins — Do This Week</div><div class="rc-hs">zero friction · immediate impact</div></div></div><div class="rc-body"><div class="qw-list">'+d.quickWins.map(w=>'<div class="qw-r">'+svgBolt+w+'</div>').join('')+'</div></div></div>';}
   h+='<div class="rg">';
