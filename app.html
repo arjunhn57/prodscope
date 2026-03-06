@@ -222,6 +222,64 @@ svg{flex-shrink:0;}
 .pdf-btn{display:flex;align-items:center;gap:6px;padding:7px 17px;background:var(--white);border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.2s;}
 .pdf-btn svg{width:14px;height:14px;}
 .pdf-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ═══════════════ AUTH MODAL ═══════════════ */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(11,15,26,0.6);backdrop-filter:blur(8px);z-index:300;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--white);border-radius:16px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(0,0,0,0.15);overflow:hidden;animation:modalIn 0.3s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-top{padding:28px 28px 0;text-align:center;}
+.modal-logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.modal-title{font-size:20px;font-weight:800;letter-spacing:-0.4px;margin-bottom:4px;}
+.modal-sub{font-size:13.5px;color:var(--text2);margin-bottom:20px;}
+.auth-tabs{display:flex;border-bottom:1px solid var(--border2);margin:0 28px;}
+.auth-tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;}
+.auth-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.auth-body{padding:24px 28px 28px;}
+.auth-field{margin-bottom:14px;}
+.auth-field label{display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:5px;}
+.auth-field input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
+.auth-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.auth-submit{width:100%;padding:11px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-bottom:14px;}
+.auth-submit:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(79,70,229,0.3);}
+.auth-divider{display:flex;align-items:center;gap:12px;margin-bottom:14px;color:var(--text3);font-size:12px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border2);}
+.auth-google{width:100%;padding:10px;background:var(--white);border:1px solid var(--border);border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:10px;}
+.auth-google:hover{background:var(--page-bg);border-color:#D1D5DB;}
+.auth-google svg{width:18px;height:18px;}
+.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;border-radius:6px;transition:all 0.2s;display:flex;}
+.modal-close:hover{background:var(--page-bg);color:var(--text);}
+.auth-error{display:none;padding:8px 12px;background:var(--red-light);border:1px solid #FECACA;border-radius:7px;font-size:12px;color:var(--red);margin-bottom:12px;}
+.auth-error.show{display:block;}
+
+/* ═══════════════ DOCS MODAL ═══════════════ */
+.docs-body{padding:28px;max-height:70vh;overflow-y:auto;}
+.docs-section{margin-bottom:24px;}
+.docs-section:last-child{margin-bottom:0;}
+.docs-h{font-size:15px;font-weight:700;margin-bottom:8px;letter-spacing:-0.2px;}
+.docs-p{font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:8px;}
+.docs-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.docs-list li{font-size:13px;color:var(--text2);padding-left:16px;position:relative;line-height:1.55;}
+.docs-list li::before{content:'→';position:absolute;left:0;color:var(--accent);font-weight:600;}
+.docs-kbd{display:inline-block;padding:2px 7px;background:var(--page-bg);border:1px solid var(--border);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;}
+
+/* ═══════════════ SETTINGS PAGE ═══════════════ */
+.settings-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:18px;box-shadow:var(--card-shadow);}
+.settings-card h3{font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:-0.2px;}
+.settings-card p{font-size:12.5px;color:var(--text3);margin-bottom:16px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border2);}
+.settings-row:last-child{border-bottom:none;}
+.settings-row-left{display:flex;flex-direction:column;gap:2px;}
+.settings-row-label{font-size:13px;font-weight:600;}
+.settings-row-desc{font-size:11.5px;color:var(--text3);}
+.settings-toggle{width:40px;height:22px;border-radius:11px;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;border:none;}
+.settings-toggle.on{background:var(--accent);}
+.settings-toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.15);transition:transform 0.2s;}
+.settings-toggle.on::after{transform:translateX(18px);}
+.plan-badge{display:inline-flex;padding:4px 12px;background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:700;border-radius:100px;letter-spacing:0.3px;}
+.sb-signin-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(79,70,229,0.15);border:1px solid rgba(79,70,229,0.2);border-radius:8px;color:#A5B4FC;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.2s;width:100%;border:none;font-family:inherit;}
+.sb-signin-btn:hover{background:rgba(79,70,229,0.25);}
+.sb-signin-btn svg{width:16px;height:16px;}
 </style>
 </head>
 <body>
@@ -245,7 +303,9 @@ svg{flex-shrink:0;}
   </nav>
   <div class="sb-footer">
     <div class="ai-pill"><div class="ai-dot"></div><div class="ai-pill-t"><strong>Claude AI</strong> connected</div></div>
-    <div class="sb-avatar-row"><div class="sb-avatar">P</div><div><div class="sb-uname">Product Manager</div><div class="sb-urole">Pro Plan</div></div></div>
+    <div id="sbAuthArea">
+      <button class="sb-signin-btn" onclick="openAuth()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>
+    </div>
   </div>
 </aside>
 
@@ -256,8 +316,8 @@ svg{flex-shrink:0;}
       <a href="/" style="font-size:13px;color:var(--text3);font-weight:500;text-decoration:none">ProdScope</a><span class="tb-sep">›</span><span class="tb-active" id="topCrumb">New Analysis</span>
     </div>
     <div class="tb-right">
-      <button class="tb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Docs</button>
-      <button class="tb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Feedback</button>
+      <button class="tb-btn" onclick="openDocs()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Docs</button>
+      <button class="tb-btn" onclick="window.open('mailto:support@prodscope.app?subject=ProdScope Feedback','_blank')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Feedback</button>
       <div class="tb-model">claude-sonnet-4</div>
     </div>
   </header>
@@ -353,7 +413,40 @@ svg{flex-shrink:0;}
   <div class="ph" id="page-ux"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></div><div class="ph-t">UX Reports</div><div class="ph-s">UX audit reports from your analyses will be listed here. Coming in v2.</div><div style="margin-top:20px"><button onclick="showPage('analyze')" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Run New Analysis</button></div></div>
   <div class="ph" id="page-growth"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="ph-t">Growth Plans</div><div class="ph-s">AI-generated growth roadmaps from your analyses. Coming in v2.</div><div style="margin-top:20px"><button onclick="showPage('analyze')" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Run New Analysis</button></div></div>
   <div class="ph" id="page-competitors"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><div class="ph-t">Competitors</div><div class="ph-s">Competitor comparisons and gap reports from your analyses. Coming in v2.</div><div style="margin-top:20px"><button onclick="showPage('analyze')" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Run New Analysis</button></div></div>
-  <div class="ph" id="page-settings"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09c-.658.003-1.25.396-1.51 1z"/></svg></div><div class="ph-t">Settings</div><div class="ph-s">API keys, preferences, and team settings — coming in v2.</div><div style="margin-top:20px"><button onclick="showPage('analyze')" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Run New Analysis</button></div></div>
+  <div class="ph" id="page-settings" style="padding:28px 32px 60px;max-width:700px;display:none;">
+    <div style="font-size:22px;font-weight:800;letter-spacing:-0.4px;margin-bottom:4px">Settings</div>
+    <div style="font-size:13.5px;color:var(--text2);margin-bottom:24px">Manage your account and preferences.</div>
+    <div class="settings-card" id="settingsProfile">
+      <h3>Profile</h3>
+      <p>Your account information</p>
+      <div id="settingsProfileContent">
+        <div style="text-align:center;padding:16px 0">
+          <div style="font-size:14px;color:var(--text2);margin-bottom:12px">Sign in to manage your profile</div>
+          <button onclick="openAuth()" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Sign In</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-card">
+      <h3>Current Plan</h3>
+      <p>Your subscription details</p>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><span class="plan-badge">FREE TRIAL</span><div style="font-size:12px;color:var(--text3);margin-top:6px">3 free analyses remaining</div></div>
+        <button onclick="window.location.href='/'" style="padding:8px 18px;background:var(--white);border:1px solid var(--accent);color:var(--accent);border-radius:8px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Upgrade</button>
+      </div>
+    </div>
+    <div class="settings-card">
+      <h3>Preferences</h3>
+      <p>Customize your experience</p>
+      <div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Email notifications</div><div class="settings-row-desc">Get notified when analysis is complete</div></div><button class="settings-toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Auto-detect platform</div><div class="settings-row-desc">Detect platform from uploaded file type</div></div><button class="settings-toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Detailed analysis mode</div><div class="settings-row-desc">Longer, more comprehensive reports</div></div><button class="settings-toggle" onclick="this.classList.toggle('on')"></button></div>
+    </div>
+    <div class="settings-card">
+      <h3>Danger Zone</h3>
+      <p>Irreversible account actions</p>
+      <div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Delete all history</div><div class="settings-row-desc">Permanently remove all past analyses</div></div><button style="padding:6px 14px;background:var(--red-light);border:1px solid #FECACA;color:var(--red);border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer" onclick="alert('No history to delete yet.')">Delete</button></div>
+    </div>
+  </div>
 </div>
 
 <div class="loading-overlay" id="loadingOverlay">
@@ -372,7 +465,7 @@ svg{flex-shrink:0;}
 <script>
 const PAGES=['dashboard','analyze','history','ux','growth','competitors','settings'];
 const CRUMBS={analyze:'New Analysis',dashboard:'Dashboard',history:'History',ux:'UX Reports',growth:'Growth Plans',competitors:'Competitors',settings:'Settings'};
-function showPage(n){PAGES.forEach(p=>{const el=document.getElementById('page-'+p);if(!el)return;el.classList.toggle('active',p===n);const nav=document.getElementById('nav-'+p);if(nav)nav.classList.toggle('active',p===n);});document.getElementById('topCrumb').textContent=CRUMBS[n]||n;closeSidebar();}
+function showPage(n){PAGES.forEach(p=>{const el=document.getElementById('page-'+p);if(!el)return;if(p==='settings'){el.style.display=p===n?'block':'none';}else{el.classList.toggle('active',p===n);}const nav=document.getElementById('nav-'+p);if(nav)nav.classList.toggle('active',p===n);});document.getElementById('topCrumb').textContent=CRUMBS[n]||n;closeSidebar();}
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show');}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show');}
 let currentTab='mobile';
@@ -413,6 +506,150 @@ function renderResults(d,name,category,platform){
   h+='<div class="rc" style="animation-delay:0.28s"><div class="rc-head"><div class="rc-hi chi-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div><div><div class="rc-ht">ASO & SEO Keywords</div><div class="rc-hs">discoverability audit</div></div></div><div class="rc-body"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Keyword Strength Map</div><div class="kw-wrap">'+d.asoKeywords.map(k=>'<span class="kw kw-'+k.strength[0]+'">'+k.word+'</span>').join('')+'</div><div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#10B981;display:inline-block"></span>Ranking well</span><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block"></span>Moderate</span><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block"></span>Missing</span></div><div style="padding:12px 15px;background:var(--purple-light);border:1px solid #DDD6FE;border-radius:9px"><div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:5px">⭐ Review Strategy</div><div style="font-size:12px;color:var(--text2);line-height:1.6">Prompt for reviews after a key success moment — not at startup. Apps below 4.0 stars get 70% fewer installs from search.</div></div></div></div></div>';
   const el=document.getElementById('results');el.innerHTML=h;el.style.display='block';setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
+</script>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeAuth()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="modal-top">
+      <div class="modal-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <div class="modal-title" id="authModalTitle">Welcome to ProdScope</div>
+      <div class="modal-sub" id="authModalSub">Sign in to save your analyses and unlock all features.</div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</div>
+      <div class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</div>
+    </div>
+    <div class="auth-body">
+      <div class="auth-error" id="authError"></div>
+      <div class="auth-field"><label>Email</label><input type="email" id="authEmail" placeholder="you@company.com"/></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="authPassword" placeholder="••••••••"/></div>
+      <div class="auth-field" id="authNameField" style="display:none"><label>Full Name</label><input type="text" id="authName" placeholder="Your name"/></div>
+      <button class="auth-submit" id="authSubmitBtn" onclick="handleAuth()">Sign In</button>
+      <div class="auth-divider">or</div>
+      <button class="auth-google" onclick="handleGoogleAuth()">
+        <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DOCS MODAL -->
+<div class="modal-overlay" id="docsModal">
+  <div class="modal" style="position:relative;max-width:560px">
+    <button class="modal-close" onclick="closeDocs()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="modal-top">
+      <div class="modal-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></div>
+      <div class="modal-title">Documentation</div>
+      <div class="modal-sub">Learn how to use ProdScope effectively.</div>
+    </div>
+    <div class="docs-body">
+      <div class="docs-section">
+        <div class="docs-h">Getting Started</div>
+        <div class="docs-p">ProdScope analyzes your product using AI and generates a full intelligence report covering UX issues, growth opportunities, competitor gaps, and more.</div>
+        <ul class="docs-list">
+          <li>Upload an APK, IPA, or AAB file for mobile apps</li>
+          <li>Paste a URL for websites or web apps</li>
+          <li>Enter a store listing URL for published apps</li>
+        </ul>
+      </div>
+      <div class="docs-section">
+        <div class="docs-h">Analysis Goals</div>
+        <div class="docs-p">Select which areas you want AI to focus on. You can pick multiple goals for a comprehensive analysis:</div>
+        <ul class="docs-list">
+          <li><strong>UX & Design</strong> — UI patterns, accessibility, navigation</li>
+          <li><strong>New Features</strong> — Untapped USP ideas and differentiators</li>
+          <li><strong>Growth Strategy</strong> — Prioritized roadmap with effort estimates</li>
+          <li><strong>Competitor Analysis</strong> — Market gaps you can exploit</li>
+          <li><strong>ASO & SEO</strong> — Keywords and discoverability improvements</li>
+        </ul>
+      </div>
+      <div class="docs-section">
+        <div class="docs-h">Understanding Your Report</div>
+        <div class="docs-p">Each report includes a <strong>Health Score</strong> (0–100) based on 50+ product signals. Issues are tagged by severity:</div>
+        <ul class="docs-list">
+          <li><span class="docs-kbd">CRITICAL</span> — Fix immediately, blocking growth</li>
+          <li><span class="docs-kbd">WARNING</span> — Important, address within 2 weeks</li>
+          <li><span class="docs-kbd">INFO</span> — Nice to have, low priority</li>
+        </ul>
+      </div>
+      <div class="docs-section">
+        <div class="docs-h">Exporting Reports</div>
+        <div class="docs-p">Click <strong>Export PDF</strong> in the results section to download a branded PDF report. The PDF includes all sections and is formatted for sharing with stakeholders.</div>
+      </div>
+      <div class="docs-section">
+        <div class="docs-h">Need Help?</div>
+        <div class="docs-p">Click the <strong>Feedback</strong> button in the top bar to email our team, or reach out at support@prodscope.app.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auth functions
+function openAuth(){document.getElementById('authModal').classList.add('show');}
+function closeAuth(){document.getElementById('authModal').classList.remove('show');document.getElementById('authError').classList.remove('show');}
+function openDocs(){document.getElementById('docsModal').classList.add('show');}
+function closeDocs(){document.getElementById('docsModal').classList.remove('show');}
+
+function switchAuthTab(tab){
+  document.getElementById('tabLogin').classList.toggle('active',tab==='login');
+  document.getElementById('tabSignup').classList.toggle('active',tab==='signup');
+  document.getElementById('authNameField').style.display=tab==='signup'?'block':'none';
+  document.getElementById('authSubmitBtn').textContent=tab==='signup'?'Create Account':'Sign In';
+  document.getElementById('authModalTitle').textContent=tab==='signup'?'Create your account':'Welcome back';
+  document.getElementById('authModalSub').textContent=tab==='signup'?'Start analyzing products with AI today.':'Sign in to save your analyses and unlock all features.';
+  document.getElementById('authError').classList.remove('show');
+}
+
+function handleAuth(){
+  const email=document.getElementById('authEmail').value;
+  const password=document.getElementById('authPassword').value;
+  const name=document.getElementById('authName').value;
+  const isSignup=document.getElementById('tabSignup').classList.contains('active');
+  if(!email||!password){document.getElementById('authError').textContent='Please fill in all fields.';document.getElementById('authError').classList.add('show');return;}
+  if(isSignup&&!name){document.getElementById('authError').textContent='Please enter your name.';document.getElementById('authError').classList.add('show');return;}
+  if(!email.includes('@')){document.getElementById('authError').textContent='Please enter a valid email.';document.getElementById('authError').classList.add('show');return;}
+  if(password.length<6){document.getElementById('authError').textContent='Password must be at least 6 characters.';document.getElementById('authError').classList.add('show');return;}
+  const user={email:email,name:isSignup?name:email.split('@')[0],plan:'Free Trial'};
+  localStorage.setItem('prodscope_user',JSON.stringify(user));
+  closeAuth();updateAuthUI();
+}
+
+function handleGoogleAuth(){
+  const user={email:'user@gmail.com',name:'Google User',plan:'Free Trial'};
+  localStorage.setItem('prodscope_user',JSON.stringify(user));
+  closeAuth();updateAuthUI();
+}
+
+function logout(){
+  localStorage.removeItem('prodscope_user');
+  updateAuthUI();
+}
+
+function updateAuthUI(){
+  const raw=localStorage.getItem('prodscope_user');
+  const area=document.getElementById('sbAuthArea');
+  const settingsProfile=document.getElementById('settingsProfileContent');
+  if(raw){
+    const u=JSON.parse(raw);
+    const initials=u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    area.innerHTML='<div class="sb-avatar-row" onclick="showPage(\'settings\')"><div class="sb-avatar">'+initials+'</div><div><div class="sb-uname">'+u.name+'</div><div class="sb-urole">'+u.plan+'</div></div></div>';
+    if(settingsProfile){settingsProfile.innerHTML='<div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">'+u.name+'</div><div class="settings-row-desc">'+u.email+'</div></div><span class="plan-badge">'+u.plan.toUpperCase()+'</span></div><div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Sign out</div><div class="settings-row-desc">Sign out of your account</div></div><button onclick="logout()" style="padding:6px 14px;background:var(--page-bg);border:1px solid var(--border);color:var(--text2);border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer">Sign Out</button></div>';}
+  }else{
+    area.innerHTML='<button class="sb-signin-btn" onclick="openAuth()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>';
+    if(settingsProfile){settingsProfile.innerHTML='<div style="text-align:center;padding:16px 0"><div style="font-size:14px;color:var(--text2);margin-bottom:12px">Sign in to manage your profile</div><button onclick="openAuth()" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Sign In</button></div>';}
+  }
+}
+
+// Close modals on overlay click
+document.getElementById('authModal').addEventListener('click',function(e){if(e.target===this)closeAuth();});
+document.getElementById('docsModal').addEventListener('click',function(e){if(e.target===this)closeDocs();});
+
+// Init auth UI on load
+updateAuthUI();
 </script>
 </body>
 </html>
