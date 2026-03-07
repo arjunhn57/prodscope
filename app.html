@@ -281,6 +281,20 @@ svg{flex-shrink:0;}
 .sb-signin-btn:hover{background:rgba(79,70,229,0.25);}
 .sb-signin-btn svg{width:16px;height:16px;}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyCP9xNlXSEHbJUZS2T3Bt-GFe7qTgLmEY0",
+  authDomain:"prodscope-5ece1.firebaseapp.com",
+  projectId:"prodscope-5ece1",
+  storageBucket:"prodscope-5ece1.firebasestorage.app",
+  messagingSenderId:"605567202359",
+  appId:"1:605567202359:web:c6730ed96e178ba3a6bbb2"
+});
+const auth=firebase.auth();
+const googleProvider=new firebase.auth.GoogleAuthProvider();
+</script>
 </head>
 <body>
 <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
@@ -581,13 +595,13 @@ function renderResults(d,name,category,platform){
       </div>
       <div class="docs-section">
         <div class="docs-h">Need Help?</div>
-        <div class="docs-p">Click the <strong>Feedback</strong> button in the top bar to email our team, or reach out at support@prodscope.app.</div>
+        <div class="docs-p">Click the <strong>Feedback</strong> button in the top bar to email our team, or reach out at <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c4b7b1b4b4abb6b084b4b6aba0b7a7abb4a1eaa5b4b4">[email&#160;protected]</a>.</div>
       </div>
     </div>
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // Auth functions
 function openAuth(){document.getElementById('authModal').classList.add('show');}
 function closeAuth(){document.getElementById('authModal').classList.remove('show');document.getElementById('authError').classList.remove('show');}
@@ -604,52 +618,73 @@ function switchAuthTab(tab){
   document.getElementById('authError').classList.remove('show');
 }
 
-function handleAuth(){
+function showAuthError(msg){document.getElementById('authError').textContent=msg;document.getElementById('authError').classList.add('show');}
+
+async function handleAuth(){
   const email=document.getElementById('authEmail').value;
   const password=document.getElementById('authPassword').value;
   const name=document.getElementById('authName').value;
   const isSignup=document.getElementById('tabSignup').classList.contains('active');
-  if(!email||!password){document.getElementById('authError').textContent='Please fill in all fields.';document.getElementById('authError').classList.add('show');return;}
-  if(isSignup&&!name){document.getElementById('authError').textContent='Please enter your name.';document.getElementById('authError').classList.add('show');return;}
-  if(!email.includes('@')){document.getElementById('authError').textContent='Please enter a valid email.';document.getElementById('authError').classList.add('show');return;}
-  if(password.length<6){document.getElementById('authError').textContent='Password must be at least 6 characters.';document.getElementById('authError').classList.add('show');return;}
-  const user={email:email,name:isSignup?name:email.split('@')[0],plan:'Free Trial'};
-  localStorage.setItem('prodscope_user',JSON.stringify(user));
-  closeAuth();updateAuthUI();
+  if(!email||!password){showAuthError('Please fill in all fields.');return;}
+  if(isSignup&&!name){showAuthError('Please enter your name.');return;}
+  if(password.length<6){showAuthError('Password must be at least 6 characters.');return;}
+  document.getElementById('authSubmitBtn').textContent='Please wait...';
+  document.getElementById('authSubmitBtn').disabled=true;
+  try{
+    if(isSignup){
+      const cred=await auth.createUserWithEmailAndPassword(email,password);
+      await cred.user.updateProfile({displayName:name});
+    }else{
+      await auth.signInWithEmailAndPassword(email,password);
+    }
+    closeAuth();
+  }catch(err){
+    let msg=err.message;
+    if(err.code==='auth/email-already-in-use')msg='This email is already registered. Try signing in.';
+    if(err.code==='auth/wrong-password'||err.code==='auth/invalid-credential')msg='Incorrect email or password.';
+    if(err.code==='auth/user-not-found')msg='No account found with this email. Try signing up.';
+    if(err.code==='auth/too-many-requests')msg='Too many attempts. Please try again later.';
+    if(err.code==='auth/invalid-email')msg='Please enter a valid email address.';
+    showAuthError(msg);
+  }finally{
+    const isS=document.getElementById('tabSignup').classList.contains('active');
+    document.getElementById('authSubmitBtn').textContent=isS?'Create Account':'Sign In';
+    document.getElementById('authSubmitBtn').disabled=false;
+  }
 }
 
-function handleGoogleAuth(){
-  const user={email:'user@gmail.com',name:'Google User',plan:'Free Trial'};
-  localStorage.setItem('prodscope_user',JSON.stringify(user));
-  closeAuth();updateAuthUI();
+async function handleGoogleAuth(){
+  try{
+    await auth.signInWithPopup(googleProvider);
+    closeAuth();
+  }catch(err){
+    if(err.code!=='auth/popup-closed-by-user'){showAuthError('Google sign-in failed. Please try again.');}
+  }
 }
 
-function logout(){
-  localStorage.removeItem('prodscope_user');
-  updateAuthUI();
-}
+function logout(){auth.signOut();}
 
-function updateAuthUI(){
-  const raw=localStorage.getItem('prodscope_user');
+function updateAuthUI(user){
   const area=document.getElementById('sbAuthArea');
   const settingsProfile=document.getElementById('settingsProfileContent');
-  if(raw){
-    const u=JSON.parse(raw);
-    const initials=u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-    area.innerHTML='<div class="sb-avatar-row" onclick="showPage(\'settings\')"><div class="sb-avatar">'+initials+'</div><div><div class="sb-uname">'+u.name+'</div><div class="sb-urole">'+u.plan+'</div></div></div>';
-    if(settingsProfile){settingsProfile.innerHTML='<div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">'+u.name+'</div><div class="settings-row-desc">'+u.email+'</div></div><span class="plan-badge">'+u.plan.toUpperCase()+'</span></div><div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Sign out</div><div class="settings-row-desc">Sign out of your account</div></div><button onclick="logout()" style="padding:6px 14px;background:var(--page-bg);border:1px solid var(--border);color:var(--text2);border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer">Sign Out</button></div>';}
+  if(user){
+    const name=user.displayName||user.email.split('@')[0];
+    const initials=name.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+    const plan='Free Trial';
+    area.innerHTML='<div class="sb-avatar-row" onclick="showPage(\'settings\')"><div class="sb-avatar">'+initials+'</div><div><div class="sb-uname">'+name+'</div><div class="sb-urole">'+plan+'</div></div></div>';
+    if(settingsProfile){settingsProfile.innerHTML='<div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">'+name+'</div><div class="settings-row-desc">'+user.email+'</div></div><span class="plan-badge">FREE TRIAL</span></div><div class="settings-row"><div class="settings-row-left"><div class="settings-row-label">Sign out</div><div class="settings-row-desc">Sign out of your account</div></div><button onclick="logout()" style="padding:6px 14px;background:var(--page-bg);border:1px solid var(--border);color:var(--text2);border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer">Sign Out</button></div>';}
   }else{
     area.innerHTML='<button class="sb-signin-btn" onclick="openAuth()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>';
     if(settingsProfile){settingsProfile.innerHTML='<div style="text-align:center;padding:16px 0"><div style="font-size:14px;color:var(--text2);margin-bottom:12px">Sign in to manage your profile</div><button onclick="openAuth()" style="padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Sign In</button></div>';}
   }
 }
 
+// Listen for auth state changes
+auth.onAuthStateChanged(function(user){updateAuthUI(user);});
+
 // Close modals on overlay click
 document.getElementById('authModal').addEventListener('click',function(e){if(e.target===this)closeAuth();});
 document.getElementById('docsModal').addEventListener('click',function(e){if(e.target===this)closeDocs();});
-
-// Init auth UI on load
-updateAuthUI();
 </script>
 </body>
 </html>
