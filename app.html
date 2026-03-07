@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ProdScope — AI Product Intelligence</title>
+<title>ProdScope — Automated Android App Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -24,10 +24,11 @@ body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--page-
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#C9CBD6;border-radius:3px;}
 svg{flex-shrink:0;}
 
+/* ═══════ SIDEBAR ═══════ */
 .sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-w);background:var(--sidebar-bg);display:flex;flex-direction:column;z-index:50;transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);overflow:hidden;}
 .sidebar::before{content:'';position:absolute;top:-80px;right:-80px;width:200px;height:200px;background:radial-gradient(circle,rgba(79,70,229,0.1) 0%,transparent 70%);pointer-events:none;}
 .sidebar::after{content:'';position:absolute;bottom:-40px;left:-40px;width:140px;height:140px;background:radial-gradient(circle,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none;}
-.sb-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:11px;position:relative;}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:11px;position:relative;cursor:pointer;}
 .sb-logo-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:linear-gradient(135deg,#4F46E5,#7C3AED);}
 .sb-logo-name{font-size:16px;font-weight:800;color:#FFF;letter-spacing:-0.3px;}
 .sb-logo-tag{font-size:9.5px;color:rgba(255,255,255,0.3);letter-spacing:0.3px;margin-top:1px;font-weight:500;}
@@ -40,6 +41,7 @@ svg{flex-shrink:0;}
 .sb-item svg{width:16px;height:16px;opacity:0.6;flex-shrink:0;}
 .sb-item.active svg{opacity:1;color:#A5B4FC;}
 .sb-badge{margin-left:auto;font-size:9px;font-weight:700;background:linear-gradient(135deg,rgba(79,70,229,0.3),rgba(139,92,246,0.25));color:#C7D2FE;padding:2px 8px;border-radius:100px;letter-spacing:0.5px;border:1px solid rgba(79,70,229,0.2);}
+.sb-badge-new{margin-left:auto;font-size:9px;font-weight:700;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.15));color:#6EE7B7;padding:2px 8px;border-radius:100px;letter-spacing:0.5px;border:1px solid rgba(16,185,129,0.2);}
 .sb-footer{padding:14px;border-top:1px solid rgba(255,255,255,0.06);position:relative;z-index:1;}
 .sb-avatar-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;transition:background 0.2s;}
 .sb-avatar-row:hover{background:var(--nav-hover);}
@@ -50,6 +52,7 @@ svg{flex-shrink:0;}
 @keyframes pg{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{opacity:.6;box-shadow:0 0 0 5px rgba(16,185,129,0);}}
 .ai-pill-t{font-size:11px;color:rgba(255,255,255,0.45);font-weight:500;}.ai-pill-t strong{color:#6EE7B7;font-weight:600;}
 
+/* ═══════ MAIN ═══════ */
 .main{margin-left:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column;}
 .topbar{height:54px;background:rgba(255,255,255,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 26px;position:sticky;top:0;z-index:40;}
 .tb-left{display:flex;align-items:center;gap:6px;}.tb-crumb{font-size:13px;color:var(--text3);font-weight:500;}.tb-sep{color:var(--border);font-size:16px;margin:0 2px;}.tb-active{font-size:13.5px;font-weight:700;color:var(--text);letter-spacing:-0.2px;}
@@ -60,11 +63,13 @@ svg{flex-shrink:0;}
 .tb-model::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
 .hamburger{display:none;background:none;border:none;color:var(--text2);cursor:pointer;padding:4px;}
 
+/* ═══════ PAGE ═══════ */
 .page{display:none;}.page.active{display:block;}
-.page-content{padding:28px 32px 60px;max-width:940px;}
+.page-content{padding:28px 32px 60px;max-width:720px;}
 .page-title{font-size:22px;font-weight:800;letter-spacing:-0.4px;margin-bottom:4px;}
 .page-sub{font-size:13.5px;color:var(--text2);margin-bottom:24px;line-height:1.6;}
 
+/* ═══════ CARDS ═══════ */
 .card{background:var(--white);border:1px solid var(--border);border-radius:12px;box-shadow:var(--card-shadow);margin-bottom:18px;overflow:hidden;transition:box-shadow 0.3s;}
 .card:hover{box-shadow:var(--card-shadow-hover);}
 .card-head{padding:15px 20px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:11px;}
@@ -73,11 +78,17 @@ svg{flex-shrink:0;}
 .ch-title{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.15px;}.ch-sub{font-size:11.5px;color:var(--text3);margin-top:1px;}
 .card-body{padding:20px;}
 
-.i-tabs{display:flex;border-bottom:1px solid var(--border2);}
-.i-tab{padding:11px 18px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;display:flex;align-items:center;gap:7px;white-space:nowrap;}.i-tab svg{width:14px;height:14px;}
-.i-tab:hover:not(.active){color:var(--text2);}.i-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-.tab-pane{display:none;padding:20px;}.tab-pane.active{display:block;}
+/* ═══════ FORM ═══════ */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:15px;}.fg-full{grid-column:1/-1;}
+.fl{display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.fl-opt{font-weight:400;color:var(--text3);margin-left:4px;}
+.fi,.fs,.ft{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--text);background:var(--white);outline:none;transition:border-color 0.2s,box-shadow 0.2s;-webkit-appearance:none;}
+.fi:focus,.fs:focus,.ft:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}.fi::placeholder,.ft::placeholder{color:var(--text3);}
+.ft{resize:vertical;min-height:80px;line-height:1.55;}
+.fi-hint{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.5;}
+.fi-hint svg{width:12px;height:12px;vertical-align:-2px;margin-right:3px;}
 
+/* ═══════ DROP ZONE ═══════ */
 .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:36px 24px;text-align:center;cursor:pointer;transition:all 0.25s;background:linear-gradient(180deg,#FAFAFE 0%,#F5F6FA 100%);position:relative;}
 .drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:linear-gradient(180deg,#EEF2FF 0%,#E8EAFF 100%);}
 .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
@@ -85,145 +96,125 @@ svg{flex-shrink:0;}
 .dz-title{font-size:14.5px;font-weight:700;margin-bottom:5px;}.dz-sub{font-size:12.5px;color:var(--text2);margin-bottom:14px;}
 .fmt-row{display:flex;gap:7px;justify-content:center;}
 .fmt{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 10px;border-radius:6px;border:1px solid;}
-.fmt-apk{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}.fmt-ipa{background:#EEF2FF;border-color:#C7D2FE;color:#3730A3;}.fmt-aab{background:#FFFBEB;border-color:#FDE68A;color:#92400E;}
+.fmt-apk{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}.fmt-aab{background:#FFFBEB;border-color:#FDE68A;color:#92400E;}
 .file-prev{display:none;align-items:center;gap:12px;padding:11px 15px;background:var(--green-light);border:1px solid #A7F3D0;border-radius:9px;margin-top:12px;}.file-prev.show{display:flex;}
 .fp-icon{color:var(--green);}.fp-icon svg{width:20px;height:20px;}
 .fp-name{font-size:13px;font-weight:600;color:#065F46;font-family:'JetBrains Mono',monospace;}.fp-size{font-size:11px;color:var(--text2);}
 .fp-rm{margin-left:auto;cursor:pointer;color:var(--text3);transition:color 0.2s;display:flex;align-items:center;}.fp-rm:hover{color:var(--red);}.fp-rm svg{width:16px;height:16px;}
 
-.url-wrap{position:relative;}.url-ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);}.url-ico svg{width:15px;height:15px;}
-.url-field{width:100%;padding:10px 13px 10px 38px;border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--text);background:var(--white);outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
-.url-field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}.url-field::placeholder{color:var(--text3);}
-.url-hint{font-size:11px;color:var(--text3);margin-top:6px;}
-
-.fg{display:grid;grid-template-columns:1fr 1fr;gap:15px;}.fg-full{grid-column:1/-1;}
-.fl{display:block;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px;}
-.fi,.fs,.ft{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--text);background:var(--white);outline:none;transition:border-color 0.2s,box-shadow 0.2s;-webkit-appearance:none;}
-.fi:focus,.fs:focus,.ft:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}.fi::placeholder,.ft::placeholder{color:var(--text3);}
-.fs{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA0B3' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:32px;}
-.ft{resize:vertical;min-height:80px;line-height:1.55;}
-
+/* ═══════ GOALS ═══════ */
 .goals-wrap{display:flex;flex-wrap:wrap;gap:8px;}
 .g-chip{padding:6px 14px;border-radius:100px;border:1px solid var(--border);background:var(--white);color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;transition:all 0.2s;user-select:none;display:flex;align-items:center;gap:6px;}.g-chip svg{width:13px;height:13px;}
 .g-chip:hover:not(.on){background:var(--page-bg);border-color:#C9CBD6;color:var(--text);}
 .g-chip.on{background:var(--accent-light);border-color:#C7D2FE;color:var(--accent);font-weight:600;}
+
+/* ═══════ CREDENTIAL BANNER ═══════ */
+.cred-banner{padding:12px 15px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;}
+.cred-banner svg{width:16px;height:16px;color:#B45309;flex-shrink:0;margin-top:1px;}
+.cred-banner-text{font-size:12px;color:#92400E;line-height:1.6;}
+.cred-banner-text strong{font-weight:700;color:#78350F;}
+
+/* ═══════ SECURITY NOTE ═══════ */
+.sec-note{padding:12px 15px;background:var(--green-light);border:1px solid #A7F3D0;border-radius:9px;display:flex;align-items:flex-start;gap:10px;}
+.sec-note svg{width:16px;height:16px;color:#059669;flex-shrink:0;margin-top:1px;}
+.sec-note-text{font-size:12px;color:#065F46;line-height:1.6;}
+
+/* ═══════ DIVIDER & ACTION ═══════ */
 .divider{height:1px;background:var(--border2);margin:18px 0;}
 .action-row{display:flex;align-items:center;justify-content:space-between;gap:14px;}
 .action-hint{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-weight:500;}.action-hint svg{width:14px;height:14px;}
-.analyze-btn{display:flex;align-items:center;gap:8px;padding:10px 24px;background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 100%);color:#fff;border:none;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:all 0.25s;box-shadow:0 2px 8px rgba(79,70,229,0.3),inset 0 1px 0 rgba(255,255,255,0.15);white-space:nowrap;}.analyze-btn svg{width:15px;height:15px;}
-.analyze-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(79,70,229,0.4),inset 0 1px 0 rgba(255,255,255,0.15);}
-.analyze-btn:active{transform:translateY(0);}
+.analyze-btn{display:flex;align-items:center;gap:8px;padding:12px 28px;background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 100%);color:#fff;border:none;border-radius:9px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.25s;box-shadow:0 2px 8px rgba(79,70,229,0.3),inset 0 1px 0 rgba(255,255,255,0.15);white-space:nowrap;}.analyze-btn svg{width:16px;height:16px;}
+.analyze-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 20px rgba(79,70,229,0.4),inset 0 1px 0 rgba(255,255,255,0.15);}
+.analyze-btn:active:not(:disabled){transform:translateY(0);}
+.analyze-btn:disabled{opacity:0.5;cursor:not-allowed;}
 
-.loading-overlay{display:none;position:fixed;inset:0;background:rgba(245,246,250,0.92);backdrop-filter:blur(16px);z-index:200;flex-direction:column;align-items:center;justify-content:center;}.loading-overlay.show{display:flex;}
-.loading-orb{width:56px;height:56px;border-radius:50%;position:relative;margin-bottom:24px;}
-.loading-orb::before{content:'';position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent,var(--accent),transparent);animation:orbspin 1.2s linear infinite;}
-.loading-orb::after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--page-bg);}
-@keyframes orbspin{to{transform:rotate(360deg);}}
-.loading-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-0.4px;}
-.loading-sub{font-size:12px;color:var(--text3);margin-bottom:30px;font-family:'JetBrains Mono',monospace;font-weight:500;}
-.loading-steps{display:flex;flex-direction:column;gap:10px;width:290px;}
-.l-step{display:flex;align-items:center;gap:11px;font-size:12.5px;color:var(--text3);transition:all 0.3s;font-weight:500;}.l-step.active{color:var(--text);}.l-step.done{color:var(--green);}
-.l-num{width:24px;height:24px;border-radius:7px;background:var(--white);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0;transition:all 0.3s;}
-.l-step.active .l-num{background:var(--accent);border-color:var(--accent);color:#fff;animation:pa 1.5s ease-in-out infinite;}
-.l-step.done .l-num{background:var(--green);border-color:var(--green);color:#fff;border-radius:50%;}
-@keyframes pa{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,0.3);}50%{box-shadow:0 0 0 6px rgba(79,70,229,0);}}
-
-#results{display:none;}
-.res-hcard{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:22px 24px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:16px;box-shadow:var(--card-shadow);position:relative;overflow:hidden;}
-.res-hcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4F46E5,#8B5CF6,#A78BFA,#4F46E5);background-size:200% 100%;animation:shimmer 3s ease infinite;}
+/* ═══════ JOB STATUS PAGE ═══════ */
+.job-status{display:none;}.job-status.active{display:block;}
+.job-card{background:var(--white);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.06);padding:36px 32px;text-align:center;max-width:560px;margin:0 auto;position:relative;overflow:hidden;}
+.job-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4F46E5,#8B5CF6,#A78BFA,#4F46E5);background-size:200% 100%;animation:shimmer 3s ease infinite;}
 @keyframes shimmer{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
-.res-name{font-size:19px;font-weight:800;letter-spacing:-0.4px;margin-bottom:4px;}.res-meta{font-size:11.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:10px;font-weight:500;}
-.res-summary{font-size:13.5px;color:var(--text2);line-height:1.65;max-width:540px;}
-.score-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;}
-.score-circ{position:relative;width:76px;height:76px;}.score-circ svg{transform:rotate(-90deg);width:76px;height:76px;}
-.sc-bg{fill:none;stroke:var(--border);stroke-width:5;}.sc-fill{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);}
-.sc-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.sc-num{font-size:22px;font-weight:800;line-height:1;}.sc-lbl{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;font-weight:600;font-family:'JetBrains Mono',monospace;}
 
-.rg{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-.rc{background:var(--white);border:1px solid var(--border);border-radius:12px;box-shadow:var(--card-shadow);overflow:hidden;animation:fu 0.5s cubic-bezier(0.4,0,0.2,1) forwards;opacity:0;transition:box-shadow 0.3s;}.rc:hover{box-shadow:var(--card-shadow-hover);}
-@keyframes fu{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-.rc-head{padding:13px 18px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:10px;}
-.rc-hi{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}.rc-hi svg{width:15px;height:15px;}
-.rc-ht{font-size:13.5px;font-weight:700;color:var(--text);}.rc-hs{font-size:10.5px;color:var(--text3);margin-top:1px;font-family:'JetBrains Mono',monospace;font-weight:500;}
-.rc-body{padding:14px 18px;display:flex;flex-direction:column;gap:9px;}
+.job-orb{width:64px;height:64px;border-radius:50%;position:relative;margin:0 auto 20px;}
+.job-orb::before{content:'';position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,transparent,var(--accent),transparent);animation:orbspin 1.2s linear infinite;}
+.job-orb::after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--white);}
+@keyframes orbspin{to{transform:rotate(360deg);}}
 
-.issue-r{padding:11px 14px;background:var(--page-bg);border-radius:8px;border-left:3px solid transparent;transition:transform 0.15s;}.issue-r:hover{transform:translateX(2px);}
-.issue-r.critical{border-left-color:var(--red);}.issue-r.warning{border-left-color:var(--yellow);}.issue-r.info{border-left-color:var(--accent);}
-.i-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
-.sev{font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;}
-.sev.critical{background:var(--red-light);color:var(--red);}.sev.warning{background:var(--yellow-light);color:#B45309;}.sev.info{background:var(--accent-light);color:var(--accent);}
-.i-title{font-size:12.5px;font-weight:600;}.i-desc{font-size:12px;color:var(--text2);line-height:1.55;}
+.job-orb.done::before{background:var(--green);animation:none;}
+.job-orb.done::after{background:var(--green);inset:8px;}
 
-.usp-r{padding:11px 14px;background:var(--page-bg);border-radius:8px;border:1px solid var(--border2);transition:all 0.2s;}.usp-r:hover{border-color:#C7D2FE;background:#FAFAFF;}
-.usp-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;}.usp-t{font-size:12.5px;font-weight:600;}
-.imp{font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;}
-.imp.high{background:var(--green-light);color:#065F46;}.imp.medium{background:var(--yellow-light);color:#92400E;}
-.usp-d{font-size:12px;color:var(--text2);line-height:1.55;}
+.job-title{font-size:20px;font-weight:800;letter-spacing:-0.4px;margin-bottom:6px;}
+.job-sub{font-size:13px;color:var(--text2);margin-bottom:8px;line-height:1.6;}
+.job-timer{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--accent);margin-bottom:24px;letter-spacing:-0.5px;}
 
-.mtile-g{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
-.mtile{padding:16px 14px;background:var(--page-bg);border-radius:10px;text-align:center;border:1px solid var(--border2);transition:border-color 0.2s;}.mtile:hover{border-color:#C7D2FE;}
-.mtile-v{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:3px;}.mtile-l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px;font-weight:600;}
+.job-steps{display:flex;flex-direction:column;gap:0;text-align:left;margin-bottom:28px;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+.j-step{display:flex;align-items:center;gap:12px;padding:12px 16px;font-size:13px;color:var(--text3);font-weight:500;background:var(--white);border-bottom:1px solid var(--border2);transition:all 0.3s;}
+.j-step:last-child{border-bottom:none;}
+.j-step.active{color:var(--text);background:var(--accent-light);}
+.j-step.done{color:var(--green);background:var(--green-light);}
+.j-step.failed{color:var(--red);background:var(--red-light);}
+.j-num{width:26px;height:26px;border-radius:50%;background:var(--page-bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0;transition:all 0.3s;}
+.j-step.active .j-num{background:var(--accent);border-color:var(--accent);color:#fff;animation:pa 1.5s ease-in-out infinite;}
+.j-step.done .j-num{background:var(--green);border-color:var(--green);color:#fff;}
+.j-step.failed .j-num{background:var(--red);border-color:var(--red);color:#fff;}
+@keyframes pa{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,0.3);}50%{box-shadow:0 0 0 6px rgba(79,70,229,0);}}
+.j-step-text{flex:1;}.j-step-detail{font-size:11px;color:var(--text3);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+.upload-progress{height:4px;background:var(--border2);border-radius:2px;overflow:hidden;margin-top:8px;}
+.upload-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));border-radius:2px;transition:width 0.2s;}
 
-.comp-r{padding:11px 14px;background:var(--page-bg);border-radius:8px;transition:transform 0.15s;}.comp-r:hover{transform:translateX(2px);}
-.comp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}.comp-n{font-size:12.5px;font-weight:600;}.comp-rt{font-size:11px;color:var(--yellow);font-family:'JetBrains Mono',monospace;font-weight:600;}
-.comp-bg{height:4px;background:var(--border);border-radius:2px;margin-bottom:6px;overflow:hidden;}.comp-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--purple));}
-.comp-g{font-size:11px;color:var(--accent);font-weight:500;}
+.job-email-note{padding:14px 18px;background:var(--accent-light);border:1px solid #C7D2FE;border-radius:10px;display:flex;align-items:flex-start;gap:10px;text-align:left;margin-bottom:20px;}
+.job-email-note svg{width:18px;height:18px;color:var(--accent);flex-shrink:0;margin-top:1px;}
+.job-email-note-text{font-size:12.5px;color:var(--accent-dark);line-height:1.6;}
+.job-email-note-text strong{font-weight:700;}
 
-.act-r{display:flex;gap:12px;padding:11px 14px;background:var(--page-bg);border-radius:8px;transition:transform 0.15s;}.act-r:hover{transform:translateX(2px);}
-.act-badge{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#4F46E5,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;font-family:'JetBrains Mono',monospace;margin-top:1px;}
-.act-t{font-size:12.5px;font-weight:600;margin-bottom:3px;}.act-d{font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:6px;}
-.act-tags{display:flex;gap:5px;flex-wrap:wrap;}
-.at{font-size:10px;padding:2px 8px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-weight:600;}
-.at-low{background:var(--green-light);color:#065F46;}.at-medium{background:var(--yellow-light);color:#92400E;}.at-high{background:var(--red-light);color:#991B1B;}.at-time{background:var(--page-bg);color:var(--text3);border:1px solid var(--border);}
+.job-actions{display:flex;gap:10px;justify-content:center;}
+.job-btn-secondary{padding:9px 22px;background:var(--white);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
+.job-btn-secondary:hover{background:var(--page-bg);color:var(--text);}
+.job-btn-secondary svg{width:14px;height:14px;}
 
-.kw-wrap{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
-.kw{padding:4px 11px;border-radius:6px;border:1px solid;font-size:11.5px;font-weight:600;font-family:'JetBrains Mono',monospace;transition:transform 0.15s;}.kw:hover{transform:scale(1.05);}
-.kw-s{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}.kw-m{background:var(--accent-light);border-color:#C7D2FE;color:#3730A3;}.kw-w{background:var(--red-light);border-color:#FECACA;color:#991B1B;}
-
-.qw-list{display:flex;flex-direction:column;gap:8px;}
-.qw-r{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#ECFDF5,#F0FDF9);border:1px solid #A7F3D0;border-radius:8px;font-size:12.5px;color:#065F46;line-height:1.55;transition:transform 0.15s;}.qw-r:hover{transform:translateX(2px);}
-.qw-r svg{width:14px;height:14px;flex-shrink:0;margin-top:2px;color:#10B981;}
-
-.reset-btn{padding:7px 17px;background:var(--white);border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;}.reset-btn svg{width:14px;height:14px;}.reset-btn:hover{background:var(--page-bg);color:var(--text);}
-
+/* ═══════ PLACEHOLDER PAGES ═══════ */
 .ph{display:none;flex-direction:column;align-items:center;justify-content:center;padding:100px 28px;text-align:center;}.ph.active{display:flex;}
 .ph-ico{margin-bottom:16px;color:var(--text3);opacity:0.3;}.ph-ico svg{width:48px;height:48px;}
 .ph-t{font-size:18px;font-weight:800;margin-bottom:7px;letter-spacing:-0.3px;}.ph-s{font-size:13.5px;color:var(--text2);max-width:340px;line-height:1.65;}
 
+/* ═══════ SIDEBAR OVERLAY ═══════ */
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(11,15,26,0.5);backdrop-filter:blur(4px);z-index:45;}.sb-overlay.show{display:block;}
+
+/* ═══════ RESPONSIVE ═══════ */
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0);box-shadow:8px 0 40px rgba(0,0,0,0.2);}
-  .main{margin-left:0;}.hamburger{display:block;}.fg{grid-template-columns:1fr;}.rg{grid-template-columns:1fr;}
-  .page-content{padding:18px 16px 60px;}.action-row{flex-direction:column;align-items:stretch;}.analyze-btn{justify-content:center;}.res-hcard{flex-direction:column;}
+  .main{margin-left:0;}.hamburger{display:block;}.fg{grid-template-columns:1fr;}
+  .page-content{padding:18px 16px 60px;}.action-row{flex-direction:column;align-items:stretch;}.analyze-btn{justify-content:center;}
+  .job-card{padding:28px 20px;margin:0 8px;}
 }
 </style>
 </head>
 <body>
+
 <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
+
+<!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" id="sidebar">
-  <div class="sb-logo">
+  <div class="sb-logo" onclick="location.href='index.html'">
     <div class="sb-logo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg></div>
-    <div><div class="sb-logo-name">ProdScope</div><div class="sb-logo-tag">AI Product Intelligence</div></div>
+    <div><div class="sb-logo-name">ProdScope</div><div class="sb-logo-tag">Automated App Testing</div></div>
   </div>
   <nav class="sb-nav">
     <div class="sb-section">Main</div>
-    <div class="sb-item" id="nav-dashboard" onclick="showPage('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</div>
     <div class="sb-item active" id="nav-analyze" onclick="showPage('analyze')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>New Analysis<span class="sb-badge">AI</span></div>
     <div class="sb-item" id="nav-history" onclick="showPage('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>History</div>
     <div class="sb-section" style="margin-top:6px">Reports</div>
     <div class="sb-item" id="nav-ux" onclick="showPage('ux')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>UX Reports</div>
     <div class="sb-item" id="nav-growth" onclick="showPage('growth')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Growth Plans</div>
-    <div class="sb-item" id="nav-competitors" onclick="showPage('competitors')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Competitors</div>
     <div class="sb-section" style="margin-top:6px">Account</div>
     <div class="sb-item" id="nav-settings" onclick="showPage('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</div>
   </nav>
   <div class="sb-footer">
-    <div class="ai-pill"><div class="ai-dot"></div><div class="ai-pill-t"><strong>Claude AI</strong> connected</div></div>
+    <div class="ai-pill"><div class="ai-dot"></div><div class="ai-pill-t"><strong>AI Engine</strong> ready</div></div>
     <div class="sb-avatar-row"><div class="sb-avatar">P</div><div><div class="sb-uname">Product Manager</div><div class="sb-urole">Pro Plan</div></div></div>
   </div>
 </aside>
 
+<!-- ═══════ MAIN CONTENT ═══════ -->
 <div class="main">
   <header class="topbar">
     <div class="tb-left">
@@ -232,160 +223,480 @@ svg{flex-shrink:0;}
     </div>
     <div class="tb-right">
       <button class="tb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Docs</button>
-      <button class="tb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Feedback</button>
-      <div class="tb-model">claude-sonnet-4</div>
+      <div class="tb-model">Android · Haiku + Sonnet</div>
     </div>
   </header>
 
+  <!-- ═══════ ANALYSIS FORM PAGE ═══════ -->
   <div class="page active" id="page-analyze">
     <div class="page-content">
-      <div class="page-title">New Analysis</div>
-      <div class="page-sub">Upload a build, paste a URL, or submit a store link to get a full AI-powered product audit in ~15 seconds.</div>
+      <div class="page-title">New Deep Analysis</div>
+      <div class="page-sub">Upload your Android build. Our AI will install it, crawl every screen, detect bugs, and generate a full UX audit — delivered to your inbox in 5-10 minutes.</div>
 
+      <!-- CARD 1: APK UPLOAD -->
       <div class="card">
         <div class="card-head">
-          <div class="ch-icon chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-          <div><div class="ch-title">Product Input</div><div class="ch-sub">Select how you want to analyze your product</div></div>
+          <div class="ch-icon chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div><div class="ch-title">Upload Android Build</div><div class="ch-sub">We'll install and test your app automatically</div></div>
         </div>
-        <div class="i-tabs">
-          <div class="i-tab active" onclick="switchTab('mobile',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>Mobile App</div>
-          <div class="i-tab" onclick="switchTab('website',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>Website</div>
-          <div class="i-tab" onclick="switchTab('store',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Store Listing</div>
-        </div>
-        <div class="tab-pane active" id="tab-mobile">
+        <div class="card-body">
           <div class="drop-zone" id="dropZone">
-            <input type="file" id="fileInput" accept=".apk,.ipa,.aab"/>
-            <div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg></div>
-            <div class="dz-title">Drop your build file here</div>
-            <div class="dz-sub">Drag and drop, or click to browse your computer</div>
-            <div class="fmt-row"><span class="fmt fmt-apk">.APK</span><span class="fmt fmt-ipa">.IPA</span><span class="fmt fmt-aab">.AAB</span></div>
+            <input type="file" id="apkFile" accept=".apk,.aab" onchange="handleFile(this)"/>
+            <div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
+            <div class="dz-title">Drop your APK or AAB here</div>
+            <div class="dz-sub">or click to browse files</div>
+            <div class="fmt-row">
+              <span class="fmt fmt-apk">.APK</span>
+              <span class="fmt fmt-aab">.AAB</span>
+            </div>
           </div>
           <div class="file-prev" id="filePrev">
-            <span class="fp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></span>
-            <div><div class="fp-name" id="fpName">app.apk</div><div class="fp-size" id="fpSize">24.3 MB</div></div>
-            <span class="fp-rm" onclick="removeFile()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+            <div class="fp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+            <div><div class="fp-name" id="fileName"></div><div class="fp-size" id="fileSize"></div></div>
+            <div class="fp-rm" onclick="removeFile()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
           </div>
-        </div>
-        <div class="tab-pane" id="tab-website">
-          <label class="fl">Website or Web App URL</label>
-          <div class="url-wrap"><span class="url-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></span><input type="url" class="url-field" id="urlInput" placeholder="https://yourwebsite.com"/></div>
-          <div class="url-hint">Supports any public web app, SaaS product, or marketing site</div>
-        </div>
-        <div class="tab-pane" id="tab-store">
-          <label class="fl">App Store or Play Store URL</label>
-          <div class="url-wrap"><span class="url-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><input type="url" class="url-field" id="storeInput" placeholder="https://play.google.com/store/apps/details?id=..."/></div>
-          <div class="url-hint">Supports Google Play Store and Apple App Store listings</div>
         </div>
       </div>
 
+      <!-- CARD 2: DEMO CREDENTIALS -->
+      <div class="card">
+        <div class="card-head">
+          <div class="ch-icon chi-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+          <div><div class="ch-title">Demo Credentials</div><div class="ch-sub">So our AI can log in and test your app</div></div>
+        </div>
+        <div class="card-body">
+          <div class="cred-banner">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div class="cred-banner-text"><strong>Important:</strong> Use test/staging credentials only — never production admin accounts. If your app uses OTP, please set it to <strong>123456</strong> for the test account. Credentials are auto-deleted after analysis.</div>
+          </div>
+          <div class="fg">
+            <div>
+              <label class="fl" for="credUser">Email or Username</label>
+              <input class="fi" id="credUser" type="text" placeholder="test@yourapp.com"/>
+            </div>
+            <div>
+              <label class="fl" for="credPass">Password</label>
+              <input class="fi" id="credPass" type="password" placeholder="test account password"/>
+            </div>
+          </div>
+          <div class="fi-hint" style="margin-top:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            If your app doesn't have login, leave these fields blank. Our crawler will start from the first screen.
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3: GOLDEN PATH + PAIN POINTS -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-          <div><div class="ch-title">Product Details</div><div class="ch-sub">Helps AI give more targeted, accurate recommendations</div></div>
+          <div><div class="ch-title">Testing Instructions</div><div class="ch-sub">Help our AI focus on what matters most</div></div>
         </div>
         <div class="card-body">
           <div class="fg">
-            <div><label class="fl">Product Name</label><input class="fi" id="appName" type="text" placeholder="e.g. MyApp, Notion, Figma"/></div>
-            <div><label class="fl">Category</label><select class="fs" id="appCategory"><option value="">Select category...</option><option>SaaS</option><option>E-Commerce</option><option>Mobile App</option><option>Marketplace</option><option>Social Media</option><option>Education</option><option>Finance</option><option>Health & Fitness</option><option>Gaming</option><option>Developer Tools</option><option>Productivity</option><option>Other</option></select></div>
-            <div><label class="fl">Platform</label><select class="fs" id="platform"><option>Web</option><option>Android</option><option>iOS</option><option>Cross-Platform</option></select></div>
-            <div><label class="fl">Target Region</label><select class="fs" id="region"><option>Global</option><option>North America</option><option>Europe</option><option>South Asia</option><option>Southeast Asia</option><option>Latin America</option><option>Middle East</option></select></div>
-            <div class="fg-full"><label class="fl">Known Issues or Pain Points <span style="font-weight:400;color:var(--text3)">(optional)</span></label><textarea class="ft" id="painPoints" placeholder="Describe any problems, low ratings, or specific areas you want AI to focus on..."></textarea></div>
+            <div class="fg-full">
+              <label class="fl" for="goldenPath">Key User Flow<span class="fl-opt">(optional)</span></label>
+              <textarea class="ft" id="goldenPath" placeholder="Describe the main flow you want tested, e.g.: Login → Home feed → Tap first item → Add to cart → Checkout → Payment screen"></textarea>
+              <div class="fi-hint" style="margin-top:5px">Our AI will follow this path first, then explore other screens on its own.</div>
+            </div>
+            <div class="fg-full">
+              <label class="fl" for="painPoints">Known Issues or Pain Points<span class="fl-opt">(optional)</span></label>
+              <textarea class="ft" id="painPoints" placeholder="Any areas you already know need work? e.g.: Users drop off at checkout, onboarding feels too long, settings page has layout issues on small screens..."></textarea>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- CARD 4: ANALYSIS GOALS -->
       <div class="card">
         <div class="card-head">
-          <div class="ch-icon chi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
-          <div><div class="ch-title">Analysis Goals</div><div class="ch-sub">Select what to improve — multi-select supported</div></div>
+          <div class="ch-icon chi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+          <div><div class="ch-title">Analysis Goals</div><div class="ch-sub">Select what you want the AI to focus on</div></div>
         </div>
         <div class="card-body">
           <div class="goals-wrap">
-            <span class="g-chip on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>UX & Design</span>
-            <span class="g-chip on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>New Features</span>
-            <span class="g-chip on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Growth Strategy</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Monetization</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>ASO & SEO</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Competitor Analysis</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8m-4-4h8"/></svg>Accessibility</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Performance</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>Mobile Experience</span>
-            <span class="g-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>Market Expansion</span>
-          </div>
-          <div class="divider"></div>
-          <div class="action-row">
-            <div class="action-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>~15 seconds</div>
-            <button class="analyze-btn" onclick="startAnalysis()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Run Analysis</button>
+            <div class="g-chip on" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>UI/UX Issues</div>
+            <div class="g-chip on" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Bug Detection</div>
+            <div class="g-chip on" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Accessibility</div>
+            <div class="g-chip" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Performance</div>
+            <div class="g-chip" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Navigation Flow</div>
+            <div class="g-chip" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Security Review</div>
+            <div class="g-chip" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>Onboarding UX</div>
+            <div class="g-chip" onclick="this.classList.toggle('on')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>Monetization</div>
           </div>
         </div>
       </div>
-      <div id="results"></div>
+
+      <!-- CARD 5: EMAIL FOR REPORT -->
+      <div class="card">
+        <div class="card-head">
+          <div class="ch-icon chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg></div>
+          <div><div class="ch-title">Report Delivery</div><div class="ch-sub">We'll email your complete report when it's ready</div></div>
+        </div>
+        <div class="card-body">
+          <label class="fl" for="reportEmail">Your Email Address</label>
+          <input class="fi" id="reportEmail" type="email" placeholder="you@company.com" style="max-width:400px;"/>
+          <div class="sec-note" style="margin-top:14px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <div class="sec-note-text">Your data is secure. APK files and credentials are encrypted in transit and auto-deleted within 1 hour of analysis completion. We never share your data with third parties.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTION -->
+      <div class="divider"></div>
+      <div class="action-row">
+        <div class="action-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ~5-10 min · report emailed to you
+        </div>
+        <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Start Deep Analysis
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="ph" id="page-dashboard"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div><div class="ph-t">Dashboard</div><div class="ph-s">Your analysis history and key metrics will appear here after your first scan.</div></div>
-  <div class="ph" id="page-history"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="ph-t">History</div><div class="ph-s">All past analyses saved here for quick access and comparison.</div></div>
-  <div class="ph" id="page-ux"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></div><div class="ph-t">UX Reports</div><div class="ph-s">UX audit reports from your analyses will be listed here.</div></div>
-  <div class="ph" id="page-growth"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="ph-t">Growth Plans</div><div class="ph-s">AI-generated growth roadmaps from your analyses.</div></div>
-  <div class="ph" id="page-competitors"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><div class="ph-t">Competitors</div><div class="ph-s">Competitor comparisons and gap reports from your analyses.</div></div>
-  <div class="ph" id="page-settings"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09c-.658.003-1.25.396-1.51 1z"/></svg></div><div class="ph-t">Settings</div><div class="ph-s">API keys, preferences, and team settings — coming in v2.</div></div>
-</div>
+  <!-- ═══════ JOB STATUS PAGE ═══════ -->
+  <div class="page" id="page-job">
+    <div class="page-content" style="max-width:600px;padding-top:48px;">
+      <div class="job-card">
+        <div class="job-orb" id="jobOrb"></div>
+        <div class="job-title" id="jobTitle">Analysis in Progress</div>
+        <div class="job-sub" id="jobSub">Our AI is installing and testing your app right now</div>
+        <div class="job-timer" id="jobTimer">00:00</div>
 
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loading-orb"></div>
-  <div class="loading-title">Analyzing your product...</div>
-  <div class="loading-sub">claude-sonnet-4 · reviewing every detail</div>
-  <div class="loading-steps">
-    <div class="l-step active" id="ls1"><div class="l-num" id="ln1">1</div>Parsing product metadata</div>
-    <div class="l-step" id="ls2"><div class="l-num" id="ln2">2</div>Analyzing UX patterns & flows</div>
-    <div class="l-step" id="ls3"><div class="l-num" id="ln3">3</div>Scanning competitor landscape</div>
-    <div class="l-step" id="ls4"><div class="l-num" id="ln4">4</div>Generating growth opportunities</div>
-    <div class="l-step" id="ls5"><div class="l-num" id="ln5">5</div>Compiling your report</div>
+        <div class="job-steps">
+          <div class="j-step active" id="js1">
+            <div class="j-num" id="jn1">1</div>
+            <div style="flex:1;">
+              <div class="j-step-text">Uploading APK</div>
+              <div class="j-step-detail" id="js1Detail">Transferring to secure cloud</div>
+              <div class="upload-progress" id="uploadProgressBar" style="display:none;">
+                <div class="upload-progress-fill" id="uploadProgressFill" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="j-step" id="js2">
+            <div class="j-num" id="jn2">2</div>
+            <div><div class="j-step-text">Launching Emulator</div><div class="j-step-detail">Spinning up Android device</div></div>
+          </div>
+          <div class="j-step" id="js3">
+            <div class="j-num" id="jn3">3</div>
+            <div><div class="j-step-text">Installing & Crawling</div><div class="j-step-detail">Navigating through screens</div></div>
+          </div>
+          <div class="j-step" id="js4">
+            <div class="j-num" id="jn4">4</div>
+            <div><div class="j-step-text">AI Screen Analysis</div><div class="j-step-detail">Haiku analyzing each screen</div></div>
+          </div>
+          <div class="j-step" id="js5">
+            <div class="j-num" id="jn5">5</div>
+            <div><div class="j-step-text">Compiling Report</div><div class="j-step-detail">Sonnet generating final insights</div></div>
+          </div>
+          <div class="j-step" id="js6">
+            <div class="j-num" id="jn6">6</div>
+            <div><div class="j-step-text">Sending Report</div><div class="j-step-detail">Emailing PDF to you</div></div>
+          </div>
+        </div>
+
+        <div class="job-email-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>
+          <div class="job-email-note-text">You don't need to wait here. We'll email the complete report to <strong id="jobEmail">you@company.com</strong> as soon as it's ready. Feel free to close this tab.</div>
+        </div>
+
+        <div class="job-actions">
+          <button class="job-btn-secondary" onclick="startNew()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+            New Analysis
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ PLACEHOLDER PAGES ═══════ -->
+  <div class="page" id="page-history">
+    <div class="ph active"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="ph-t">Analysis History</div><div class="ph-s">Your past analyses will appear here. Run your first deep analysis to get started.</div></div>
+  </div>
+  <div class="page" id="page-ux">
+    <div class="ph active"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg></div><div class="ph-t">UX Reports</div><div class="ph-s">Detailed UX audit reports with annotated screenshots will appear here after your first analysis.</div></div>
+  </div>
+  <div class="page" id="page-growth">
+    <div class="ph active"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="ph-t">Growth Plans</div><div class="ph-s">AI-generated growth roadmaps based on your app analysis. Coming soon.</div></div>
+  </div>
+  <div class="page" id="page-settings">
+    <div class="ph active"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div><div class="ph-t">Settings</div><div class="ph-s">Account settings and preferences.</div></div>
   </div>
 </div>
 
 <script>
-const PAGES=['dashboard','analyze','history','ux','growth','competitors','settings'];
-const CRUMBS={analyze:'New Analysis',dashboard:'Dashboard',history:'History',ux:'UX Reports',growth:'Growth Plans',competitors:'Competitors',settings:'Settings'};
-function showPage(n){PAGES.forEach(p=>{const el=document.getElementById('page-'+p);if(!el)return;el.classList.toggle('active',p===n);const nav=document.getElementById('nav-'+p);if(nav)nav.classList.toggle('active',p===n);});document.getElementById('topCrumb').textContent=CRUMBS[n]||n;closeSidebar();}
+/* ═══════ SIDEBAR & NAV ═══════ */
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show');}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show');}
-let currentTab='mobile';
-function switchTab(n,btn){currentTab=n;document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.i-tab').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');btn.classList.add('active');}
-document.querySelectorAll('.g-chip').forEach(c=>c.addEventListener('click',()=>c.classList.toggle('on')));
-const dropZone=document.getElementById('dropZone'),fileInput=document.getElementById('fileInput');
-let uploadedFile=null;
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag-over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
-fileInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
-function handleFile(f){uploadedFile=f;document.getElementById('fpName').textContent=f.name;document.getElementById('fpSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';document.getElementById('filePrev').classList.add('show');dropZone.style.display='none';if(!document.getElementById('appName').value)document.getElementById('appName').value=f.name.replace(/\.(apk|ipa|aab)$/i,'').replace(/[-_]/g,' ');}
-function removeFile(){uploadedFile=null;document.getElementById('filePrev').classList.remove('show');dropZone.style.display='block';fileInput.value='';}
-function runSteps(){const d=[0,2500,5000,8000,11000],dn=[2300,4700,7700,10700,14000];for(let i=1;i<=5;i++){setTimeout(()=>document.getElementById('ls'+i).classList.add('active'),d[i-1]);setTimeout(()=>{document.getElementById('ls'+i).classList.remove('active');document.getElementById('ls'+i).classList.add('done');document.getElementById('ln'+i).textContent='✓';},dn[i-1]);}}
-function resetSteps(){for(let i=1;i<=5;i++){document.getElementById('ls'+i).classList.remove('active','done');document.getElementById('ln'+i).textContent=i;}document.getElementById('ls1').classList.add('active');}
 
-async function startAnalysis(){
-  const appName=document.getElementById('appName').value||'Unknown Product';const category=document.getElementById('appCategory').value||'Not specified';const platform=document.getElementById('platform').value;const region=document.getElementById('region').value;const painPoints=document.getElementById('painPoints').value;const goals=[...document.querySelectorAll('.g-chip.on')].map(c=>c.textContent.trim()).join(', ');
-  document.getElementById('loadingOverlay').classList.add('show');resetSteps();runSteps();
-  const prompt=`You are a world-class product strategist, UX expert, and growth consultant. Analyze this product and return ONLY a valid JSON object — no markdown, no backticks, pure JSON only.\nProduct: ${appName}\nCategory: ${category}\nPlatform: ${platform}\nRegion: ${region}\nGoals: ${goals||'General analysis'}\nKnown Issues: ${painPoints||'None'}\nInput Type: ${currentTab}\nReturn exactly this structure:\n{"overallScore":74,"scoreLabel":"Needs Work","appSummary":"2-sentence summary","criticalFixes":[{"severity":"critical","title":"Title","description":"Specific fix"},{"severity":"critical","title":"Title","description":"Specific fix"},{"severity":"warning","title":"Title","description":"Specific fix"},{"severity":"warning","title":"Title","description":"Specific fix"},{"severity":"info","title":"Title","description":"Specific fix"}],"newUSPs":[{"title":"USP","description":"Why and how","impact":"high"},{"title":"USP","description":"Why and how","impact":"high"},{"title":"USP","description":"Why and how","impact":"medium"},{"title":"USP","description":"Why and how","impact":"medium"},{"title":"USP","description":"Why and how","impact":"medium"}],"growthActions":[{"step":1,"title":"Action","description":"What to do","effort":"low","timeframe":"1 week"},{"step":2,"title":"Action","description":"What to do","effort":"medium","timeframe":"2 weeks"},{"step":3,"title":"Action","description":"What to do","effort":"medium","timeframe":"1 month"},{"step":4,"title":"Action","description":"What to do","effort":"high","timeframe":"2 months"},{"step":5,"title":"Action","description":"What to do","effort":"high","timeframe":"3 months"}],"competitors":[{"name":"Competitor 1","rating":"4.5★","strength":85,"gap":"Where you can beat them"},{"name":"Competitor 2","rating":"4.2★","strength":70,"gap":"Where you can beat them"},{"name":"Competitor 3","rating":"3.8★","strength":55,"gap":"Where you can beat them"}],"asoKeywords":[{"word":"keyword","strength":"strong"},{"word":"keyword","strength":"strong"},{"word":"keyword","strength":"medium"},{"word":"keyword","strength":"medium"},{"word":"keyword","strength":"weak"},{"word":"keyword","strength":"weak"}],"metrics":{"retentionScore":"42%","onboardingScore":"6.1/10","monetizationScore":"3.4/10","uxScore":"7.2/10"},"quickWins":["Quick win 1","Quick win 2","Quick win 3"]}\nBe hyper-specific for ${category} on ${platform} for ${region} market.`;
-  try{const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2500,messages:[{role:"user",content:prompt}]})});const data=await res.json();if(data.error){throw new Error(data.error.message||data.error);}const raw=data.content.map(i=>i.text||"").join("");const analysis=JSON.parse(raw.replace(/```json|```/g,"").trim());setTimeout(()=>{document.getElementById('loadingOverlay').classList.remove('show');renderResults(analysis,appName,category,platform);},15000);}
-  catch(err){setTimeout(()=>{document.getElementById('loadingOverlay').classList.remove('show');document.getElementById('results').innerHTML='<div class="card"><div class="card-body" style="text-align:center;padding:36px"><div style="font-size:15px;font-weight:700;margin-bottom:6px">Analysis failed</div><div style="font-size:12px;color:var(--text2);font-family:JetBrains Mono,monospace">'+err.message+'</div></div></div>';document.getElementById('results').style.display='block';},15000);}
+const pageNames={analyze:'New Analysis',history:'History',ux:'UX Reports',growth:'Growth Plans',settings:'Settings',job:'Analysis Running'};
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  const nav=document.getElementById('nav-'+id);if(nav)nav.classList.add('active');
+  document.getElementById('topCrumb').textContent=pageNames[id]||id;
+  closeSidebar();
 }
 
-function renderResults(d,name,category,platform){
-  const sc=d.overallScore,color=sc>=80?'#10B981':sc>=60?'#F59E0B':'#EF4444',circ=2*Math.PI*33,off=circ-(sc/100)*circ;
-  const svgBolt='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:11px;color:var(--green);font-family:JetBrains Mono,monospace;font-weight:600;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green)"></span>Analysis complete</span><button class="reset-btn" onclick="document.getElementById(\'results\').style.display=\'none\';window.scrollTo({top:0,behavior:\'smooth\'})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>New Analysis</button></div>';
-  h+='<div class="res-hcard"><div><div class="res-name">'+name+'</div><div class="res-meta">'+category+' · '+platform+' · '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div><div class="res-summary">'+d.appSummary+'</div></div><div class="score-wrap"><div class="score-circ"><svg viewBox="0 0 76 76"><circle class="sc-bg" cx="38" cy="38" r="33"/><circle class="sc-fill" cx="38" cy="38" r="33" stroke="'+color+'" stroke-dasharray="'+circ+'" stroke-dashoffset="'+off+'"/></svg><div class="sc-inner"><div class="sc-num" style="color:'+color+'">'+sc+'</div><div class="sc-lbl">/100</div></div></div><div style="font-size:11px;font-weight:700;color:'+color+';font-family:JetBrains Mono,monospace">'+d.scoreLabel+'</div></div></div>';
-  if(d.quickWins&&d.quickWins.length){h+='<div class="rc" style="margin-bottom:16px;animation-delay:0.05s"><div class="rc-head"><div class="rc-hi chi-green">'+svgBolt+'</div><div><div class="rc-ht">Quick Wins — Do This Week</div><div class="rc-hs">zero friction · immediate impact</div></div></div><div class="rc-body"><div class="qw-list">'+d.quickWins.map(w=>'<div class="qw-r">'+svgBolt+w+'</div>').join('')+'</div></div></div>';}
-  h+='<div class="rg">';
-  if(d.metrics){h+='<div class="rc" style="animation-delay:0.08s"><div class="rc-head"><div class="rc-hi chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div><div><div class="rc-ht">Health Metrics</div><div class="rc-hs">ai-estimated scores</div></div></div><div class="rc-body"><div class="mtile-g">'+Object.entries(d.metrics).map(([k,v])=>'<div class="mtile"><div class="mtile-v">'+v+'</div><div class="mtile-l">'+k.replace(/([A-Z])/g,' $1').replace('Score','').trim()+'</div></div>').join('')+'</div></div></div>';}
-  h+='<div class="rc" style="animation-delay:0.12s"><div class="rc-head"><div class="rc-hi chi-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div><div><div class="rc-ht">Critical Fixes</div><div class="rc-hs">'+d.criticalFixes.length+' issues — fix these first</div></div></div><div class="rc-body">'+d.criticalFixes.map(f=>'<div class="issue-r '+f.severity+'"><div class="i-top"><span class="sev '+f.severity+'">'+f.severity+'</span><span class="i-title">'+f.title+'</span></div><div class="i-desc">'+f.description+'</div></div>').join('')+'</div></div></div>';
-  h+='<div class="rg"><div class="rc" style="animation-delay:0.16s"><div class="rc-head"><div class="rc-hi chi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div><div><div class="rc-ht">New USP Opportunities</div><div class="rc-hs">'+d.newUSPs.length+' ideas to differentiate</div></div></div><div class="rc-body">'+d.newUSPs.map(u=>'<div class="usp-r"><div class="usp-top"><div class="usp-t">✦ '+u.title+'</div><span class="imp '+u.impact+'">'+u.impact+'</span></div><div class="usp-d">'+u.description+'</div></div>').join('')+'</div></div>';
-  h+='<div class="rc" style="animation-delay:0.2s"><div class="rc-head"><div class="rc-hi chi-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div><div><div class="rc-ht">Competitor Landscape</div><div class="rc-hs">where you can win</div></div></div><div class="rc-body">'+d.competitors.map(c=>'<div class="comp-r"><div class="comp-top"><div class="comp-n">'+c.name+'</div><div class="comp-rt">'+c.rating+'</div></div><div class="comp-bg"><div class="comp-fill" style="width:'+c.strength+'%"></div></div><div class="comp-g">↳ '+c.gap+'</div></div>').join('')+'</div></div></div>';
-  h+='<div class="rg"><div class="rc" style="animation-delay:0.24s"><div class="rc-head"><div class="rc-hi chi-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div><div class="rc-ht">Growth Roadmap</div><div class="rc-hs">prioritized 5-step plan</div></div></div><div class="rc-body">'+d.growthActions.map(a=>'<div class="act-r"><div class="act-badge">'+a.step+'</div><div><div class="act-t">'+a.title+'</div><div class="act-d">'+a.description+'</div><div class="act-tags"><span class="at at-'+a.effort+'">'+a.effort+' effort</span><span class="at at-time">⏱ '+a.timeframe+'</span></div></div></div>').join('')+'</div></div>';
-  h+='<div class="rc" style="animation-delay:0.28s"><div class="rc-head"><div class="rc-hi chi-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></div><div><div class="rc-ht">ASO & SEO Keywords</div><div class="rc-hs">discoverability audit</div></div></div><div class="rc-body"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Keyword Strength Map</div><div class="kw-wrap">'+d.asoKeywords.map(k=>'<span class="kw kw-'+k.strength[0]+'">'+k.word+'</span>').join('')+'</div><div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px"><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#10B981;display:inline-block"></span>Ranking well</span><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block"></span>Moderate</span><span style="font-size:11px;color:var(--text3);font-weight:500;display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block"></span>Missing</span></div><div style="padding:12px 15px;background:var(--purple-light);border:1px solid #DDD6FE;border-radius:9px"><div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:5px">⭐ Review Strategy</div><div style="font-size:12px;color:var(--text2);line-height:1.6">Prompt for reviews after a key success moment — not at startup. Apps below 4.0 stars get 70% fewer installs from search.</div></div></div></div></div>';
-  const el=document.getElementById('results');el.innerHTML=h;el.style.display='block';setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),100);
+/* ═══════ FILE HANDLING ═══════ */
+let uploadedFile=null;
+const dropZone=document.getElementById('dropZone');
+
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f&&(f.name.endsWith('.apk')||f.name.endsWith('.aab'))){setFile(f);}
+  else{alert('Please upload an .apk or .aab file');}
+});
+
+function handleFile(input){
+  const f=input.files[0];
+  if(f){setFile(f);}
+}
+
+function setFile(f){
+  uploadedFile=f;
+  document.getElementById('fileName').textContent=f.name;
+  document.getElementById('fileSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';
+  document.getElementById('filePrev').classList.add('show');
+  dropZone.style.display='none';
+}
+
+function removeFile(){
+  uploadedFile=null;
+  document.getElementById('filePrev').classList.remove('show');
+  dropZone.style.display='block';
+  document.getElementById('apkFile').value='';
+}
+
+/* ═══════ JOB TIMER ═══════ */
+let timerInterval=null;
+let timerSeconds=0;
+
+function startTimer(){
+  timerSeconds=0;
+  updateTimerDisplay();
+  timerInterval=setInterval(()=>{
+    timerSeconds++;
+    updateTimerDisplay();
+  },1000);
+}
+
+function stopTimer(){
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+}
+
+function updateTimerDisplay(){
+  const m=Math.floor(timerSeconds/60).toString().padStart(2,'0');
+  const s=(timerSeconds%60).toString().padStart(2,'0');
+  document.getElementById('jobTimer').textContent=m+':'+s;
+}
+
+/* ═══════ JOB STEPS ═══════ */
+function resetJobSteps(){
+  for(let i=1;i<=6;i++){
+    const el=document.getElementById('js'+i);
+    el.classList.remove('active','done','failed');
+    const jn=document.getElementById('jn'+i);
+    jn.textContent=i;
+    jn.innerHTML=i;
+  }
+  document.getElementById('js1Detail').textContent='Transferring to secure cloud';
+  document.getElementById('uploadProgressBar').style.display='none';
+  document.getElementById('uploadProgressFill').style.width='0%';
+}
+
+function setJobStep(step,state){
+  const el=document.getElementById('js'+step);
+  el.classList.remove('active','done','failed');
+  el.classList.add(state);
+  const jn=document.getElementById('jn'+step);
+  if(state==='done'){
+    jn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  } else {
+    jn.textContent=step;
+  }
+}
+
+function setUploadProgress(pct){
+  const bar=document.getElementById('uploadProgressBar');
+  const fill=document.getElementById('uploadProgressFill');
+  const detail=document.getElementById('js1Detail');
+  bar.style.display='block';
+  fill.style.width=pct+'%';
+  detail.textContent='Uploading… '+Math.round(pct)+'%';
+}
+
+/* ═══════ UPLOAD TO GCS VIA SIGNED URL ═══════ */
+function uploadToSignedUrl(url,file,onProgress){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('PUT',url);
+    xhr.setRequestHeader('Content-Type','application/vnd.android.package-archive');
+
+    xhr.upload.addEventListener('progress',e=>{
+      if(e.lengthComputable&&onProgress){
+        onProgress((e.loaded/e.total)*100);
+      }
+    });
+
+    xhr.onload=()=>{
+      if(xhr.status>=200&&xhr.status<300)resolve();
+      else reject(new Error('Upload failed: '+xhr.status));
+    };
+    xhr.onerror=()=>reject(new Error('Upload failed'));
+    xhr.send(file);
+  });
+}
+
+/* ═══════ POLL JOB STATUS ═══════ */
+let pollInterval=null;
+
+function pollJobStatus(jobId){
+  pollInterval=setInterval(async()=>{
+    try{
+      const res=await fetch('/api/job-status?jobId='+encodeURIComponent(jobId));
+      const data=await res.json();
+
+      if(!res.ok){
+        console.error('Job status error:',data.error);
+        return;
+      }
+
+      const status=data.status||data.state||'';
+      const currentStep=data.currentStep!=null?data.currentStep:data.step;
+
+      if(status==='complete'||status==='completed'||status==='success'){
+        stopPolling();
+        stopTimer();
+        for(let i=1;i<=6;i++)setJobStep(i,'done');
+        document.getElementById('jobOrb').classList.add('done');
+        document.getElementById('jobTitle').textContent='Report Sent!';
+        document.getElementById('jobSub').textContent='Check your inbox — your full analysis report has been emailed.';
+        return;
+      }
+
+      if(status==='failed'||status==='error'){
+        stopPolling();
+        stopTimer();
+        const activeStep=Math.min(Math.max(currentStep||2,1),6);
+        for(let i=1;i<activeStep;i++)setJobStep(i,'done');
+        setJobStep(activeStep,'failed');
+        document.getElementById('jobOrb').classList.add('done');
+        document.getElementById('jobTitle').textContent='Analysis Failed';
+        document.getElementById('jobSub').textContent=(data.error||data.message||'Something went wrong. Please try again.').slice(0,120);
+        return;
+      }
+
+      if(typeof currentStep==='number'){
+        const step=Math.min(Math.max(currentStep,1),6);
+        for(let i=1;i<step;i++)setJobStep(i,'done');
+        setJobStep(step,'active');
+      }
+    }catch(err){
+      console.error('Poll error:',err);
+    }
+  },5000);
+}
+
+function stopPolling(){
+  if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+}
+
+/* ═══════ START ANALYSIS ═══════ */
+async function startAnalysis(){
+  if(!uploadedFile){
+    alert('Please upload an APK or AAB file.');
+    return;
+  }
+  const email=document.getElementById('reportEmail').value.trim();
+  if(!email||!email.includes('@')){
+    alert('Please enter a valid email address to receive your report.');
+    return;
+  }
+
+  const goals=[...document.querySelectorAll('.g-chip.on')].map(c=>c.textContent.trim()).join(', ');
+  const painPoints=document.getElementById('painPoints').value||'';
+  const goldenPath=document.getElementById('goldenPath').value||'';
+  const credUser=document.getElementById('credUser').value||'';
+  const credPass=document.getElementById('credPass').value||'';
+  const credentials={username:credUser,password:credPass};
+
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;
+
+  document.getElementById('jobEmail').textContent=email;
+  document.getElementById('jobOrb').classList.remove('done');
+  document.getElementById('jobTitle').textContent='Analysis in Progress';
+  document.getElementById('jobSub').textContent='Our AI is installing and testing your app right now';
+  resetJobSteps();
+  setJobStep(1,'active');
+  startTimer();
+  showPage('job');
+
+  try{
+    const base=window.location.origin||'';
+    const uploadRes=await fetch(base+'/api/upload-url',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fileName:uploadedFile.name,fileSize:uploadedFile.size})
+    });
+    const uploadData=await uploadRes.json();
+    if(!uploadRes.ok){
+      throw new Error(uploadData.error||'Failed to get upload URL');
+    }
+    const {uploadUrl,fileKey}=uploadData;
+
+    await uploadToSignedUrl(uploadUrl,uploadedFile,pct=>setUploadProgress(pct));
+    setJobStep(1,'done');
+    setJobStep(2,'active');
+    document.getElementById('js1Detail').textContent='Upload complete';
+    document.getElementById('uploadProgressBar').style.display='none';
+
+    const startRes=await fetch(base+'/api/start-analysis',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        fileKey,email,credentials,goldenPath,painPoints,goals
+      })
+    });
+    const startData=await startRes.json();
+    if(!startRes.ok){
+      throw new Error(startData.error||'Failed to start analysis');
+    }
+    const {jobId}=startData;
+
+    pollJobStatus(jobId);
+  }catch(err){
+    stopTimer();
+    stopPolling();
+    setJobStep(1,'failed');
+    document.getElementById('jobOrb').classList.add('done');
+    document.getElementById('jobTitle').textContent='Analysis Failed';
+    document.getElementById('jobSub').textContent=(err.message||'Something went wrong. Please try again.').slice(0,120);
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function startNew(){
+  stopTimer();
+  stopPolling();
+  removeFile();
+  document.getElementById('painPoints').value='';
+  document.getElementById('goldenPath').value='';
+  document.getElementById('credUser').value='';
+  document.getElementById('credPass').value='';
+  showPage('analyze');
 }
 </script>
 </body>
