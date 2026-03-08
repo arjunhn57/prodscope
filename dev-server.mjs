@@ -1,8 +1,8 @@
 import http from 'node:http';
+import https from 'node:https';
 import { createReadStream, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 const ROOT = process.cwd();
@@ -26,13 +26,9 @@ const MIME_TYPES = {
 
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
-  'content-length',
-  'host',
   'keep-alive',
-  'origin',
   'proxy-authenticate',
   'proxy-authorization',
-  'referer',
   'te',
   'trailer',
   'transfer-encoding',
@@ -48,50 +44,86 @@ function getForwardHeaders(headers) {
   const forwarded = {};
   for (const [name, value] of Object.entries(headers)) {
     if (value == null) continue;
-    if (HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
+    const lowerName = name.toLowerCase();
+    if (lowerName === 'host') continue;
+    if (HOP_BY_HOP_HEADERS.has(lowerName)) continue;
     forwarded[name] = value;
   }
   return forwarded;
 }
 
 function copyUpstreamHeaders(upstream, res) {
-  for (const [name, value] of upstream.headers) {
+  for (const [name, value] of Object.entries(upstream.headers)) {
+    if (value == null) continue;
     if (HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
     res.setHeader(name, value);
   }
 }
 
-async function proxyRequest(req, res, targetPath) {
+function proxyRequest(req, res, targetPath) {
   const targetUrl = `${BACKEND_BASE}${targetPath}`;
-  const init = {
-    method: req.method,
-    headers: getForwardHeaders(req.headers),
-    signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
-  };
+  const target = new URL(targetUrl);
+  const transport = target.protocol === 'https:' ? https : http;
 
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    init.body = req;
-    init.duplex = 'half';
-  }
+  return new Promise((resolve) => {
+    let settled = false;
 
-  try {
-    const upstream = await fetch(targetUrl, init);
-    copyUpstreamHeaders(upstream, res);
-    res.statusCode = upstream.status;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
 
-    if (req.method === 'HEAD' || !upstream.body) {
-      res.end();
-      return;
-    }
+    const failProxy = (error) => {
+      if (settled) return;
+      settled = true;
+      console.error(`[dev-server] Proxy failed for ${targetPath}:`, error.message);
 
-    await pipeline(Readable.fromWeb(upstream.body), res);
-  } catch (error) {
-    console.error(`[dev-server] Proxy failed for ${targetPath}:`, error.message);
-    writeJson(res, 502, {
-      error: `VM backend is unreachable at ${targetUrl}`,
-      details: error.message,
+      if (!res.headersSent) {
+        writeJson(res, 502, {
+          error: `VM backend is unreachable at ${targetUrl}`,
+          details: error.message,
+        });
+      } else {
+        res.destroy(error);
+      }
+
+      resolve();
+    };
+
+    const upstreamReq = transport.request(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || (target.protocol === 'https:' ? 443 : 80),
+        method: req.method,
+        path: `${target.pathname}${target.search}`,
+        headers: getForwardHeaders(req.headers),
+      },
+      (upstreamRes) => {
+        copyUpstreamHeaders(upstreamRes, res);
+        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.statusMessage);
+        upstreamRes.pipe(res);
+
+        upstreamRes.on('error', failProxy);
+        res.on('finish', finish);
+        res.on('close', finish);
+      }
+    );
+
+    upstreamReq.setTimeout(PROXY_TIMEOUT_MS, () => {
+      upstreamReq.destroy(new Error(`Proxy request timed out after ${PROXY_TIMEOUT_MS}ms`));
     });
-  }
+
+    upstreamReq.on('error', failProxy);
+    req.on('error', failProxy);
+    req.on('aborted', () => {
+      upstreamReq.destroy(new Error('Client request aborted'));
+      finish();
+    });
+
+    req.pipe(upstreamReq);
+  });
 }
 
 async function serveStatic(req, res, pathname) {
