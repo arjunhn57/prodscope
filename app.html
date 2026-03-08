@@ -557,10 +557,17 @@ function pollJobStatus(jobId){
   pollInterval = setInterval(async () => {
     try{
       const res = await fetch('/api/job-status?jobId=' + encodeURIComponent(jobId));
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        console.error('Job status non-JSON response:', text?.slice(0, 200));
+        return;
+      }
 
       if(!res.ok){
-        console.error('Job status error:', data.error);
+        console.error('Job status error:', data?.error);
         return;
       }
 
@@ -654,19 +661,22 @@ async function startAnalysis(){
         if(e.lengthComputable) setUploadProgress((e.loaded / e.total) * 100);
       });
       xhr.onload = () => {
-        try{
-          const data = JSON.parse(xhr.responseText || '{}');
-          if(xhr.status >= 200 && xhr.status < 300){
-            setJobStep(1, 'done');
-            setJobStep(2, 'active');
-            document.getElementById('js1Detail').textContent = 'Upload complete';
-            document.getElementById('uploadProgressBar').style.display = 'none';
-            resolve(data.jobId);
-          } else {
-            reject(new Error(data.error || 'Failed to start analysis'));
-          }
-        } catch(e) {
-          reject(new Error('Invalid response from server'));
+        const respText = xhr.responseText || '';
+        let data;
+        try {
+          data = respText ? JSON.parse(respText) : {};
+        } catch (e) {
+          const errMsg = xhr.status >= 400 ? `Server error (${xhr.status}): ${respText.slice(0, 150)}` : 'Invalid response from server';
+          return reject(new Error(errMsg));
+        }
+        if(xhr.status >= 200 && xhr.status < 300){
+          setJobStep(1, 'done');
+          setJobStep(2, 'active');
+          document.getElementById('js1Detail').textContent = 'Upload complete';
+          document.getElementById('uploadProgressBar').style.display = 'none';
+          resolve(data.jobId);
+        } else {
+          reject(new Error(data.error || data.message || `Failed to start analysis (${xhr.status})`));
         }
       };
       xhr.onerror = () => reject(new Error('Upload failed'));

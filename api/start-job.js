@@ -5,6 +5,10 @@
  * Forwards to CLOUD_RUN_URL/api/start-job and returns response unchanged.
  */
 
+import formidable from 'formidable';
+import FormData from 'form-data';
+import { readFileSync } from 'fs';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -15,6 +19,12 @@ function setCors(res) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 }
 
+function jsonError(res, status, error) {
+  setCors(res);
+  res.setHeader('Content-Type', 'application/json');
+  res.status(status).json({ error: typeof error === 'string' ? error : (error?.message || 'Unknown error') });
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, corsHeaders);
@@ -23,49 +33,71 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    res.setHeader('Content-Type', 'application/json');
-    setCors(res);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonError(res, 405, 'Method not allowed');
   }
 
-  const backendUrl = process.env.CLOUD_RUN_URL?.replace(/\/$/, '');
+  const backendUrl = (process.env.CLOUD_RUN_URL || '').replace(/\/$/, '');
   if (!backendUrl) {
-    res.setHeader('Content-Type', 'application/json');
-    setCors(res);
-    return res.status(500).json({ error: 'Backend URL not configured' });
+    console.error('[start-job] CLOUD_RUN_URL not configured');
+    return jsonError(res, 500, 'Backend URL not configured');
   }
 
-  const contentType = req.headers['content-type'];
-  if (!contentType || !contentType.includes('multipart/form-data')) {
-    res.setHeader('Content-Type', 'application/json');
-    setCors(res);
-    return res.status(400).json({ error: 'Content-Type must be multipart/form-data' });
-  }
+  const targetUrl = `${backendUrl}/api/start-job`;
+  console.log('[start-job] Proxying to backend:', targetUrl);
 
   try {
-    const body = await new Promise((resolve, reject) => {
-      const chunks = [];
-      req.on('data', (chunk) => chunks.push(chunk));
-      req.on('end', () => resolve(Buffer.concat(chunks)));
-      req.on('error', reject);
+    const form = formidable({ multiples: false });
+    const [fields, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve([fields, files]);
+      });
     });
 
-    const response = await fetch(`${backendUrl}/api/start-job`, {
+    const apkFile = files.apk?.[0] || files.apk;
+    if (!apkFile?.filepath) {
+      console.error('[start-job] No apk file in request');
+      return jsonError(res, 400, 'apk file is required');
+    }
+
+    const outForm = new FormData();
+    outForm.append('apk', readFileSync(apkFile.filepath), {
+      filename: apkFile.originalFilename || 'upload.apk',
+      contentType: apkFile.mimetype || 'application/vnd.android.package-archive',
+    });
+    outForm.append('email', Array.isArray(fields.email) ? fields.email[0] : (fields.email || ''));
+    outForm.append('credentials', Array.isArray(fields.credentials) ? fields.credentials[0] : (fields.credentials || '{}'));
+    outForm.append('goldenPath', Array.isArray(fields.goldenPath) ? fields.goldenPath[0] : (fields.goldenPath || ''));
+    outForm.append('painPoints', Array.isArray(fields.painPoints) ? fields.painPoints[0] : (fields.painPoints || ''));
+    outForm.append('goals', Array.isArray(fields.goals) ? fields.goals[0] : (fields.goals || ''));
+
+    const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': contentType },
-      body,
+      body: outForm,
+      headers: outForm.getHeaders(),
     });
 
     const text = await response.text();
+    console.log('[start-job] Backend status:', response.status, 'response length:', text?.length);
+
+    if (!response.ok) {
+      console.error('[start-job] Backend error response:', text?.slice(0, 500));
+      let errBody;
+      try {
+        errBody = JSON.parse(text);
+      } catch {
+        errBody = { error: `Backend returned ${response.status}: ${(text || 'empty').slice(0, 200)}` };
+      }
+      setCors(res);
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(response.status).json(errBody);
+    }
+
     setCors(res);
     res.setHeader('Content-Type', 'application/json');
     res.status(response.status).send(text);
   } catch (err) {
-    console.error('start-job proxy error:', err.message);
-    res.setHeader('Content-Type', 'application/json');
-    setCors(res);
-    res.status(500).json({
-      error: err.message || 'Failed to connect to backend',
-    });
+    console.error('[start-job] Proxy error:', err.message);
+    return jsonError(res, 500, err.message || 'Failed to connect to backend');
   }
 }

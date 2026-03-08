@@ -1,7 +1,7 @@
 /**
- * Vercel serverless function: Poll job status from Cloud Run.
+ * Vercel serverless function: Proxy job status requests to backend.
  * GET /api/job-status?jobId=xxx
- * Returns: status object from Cloud Run
+ * Proxies to CLOUD_RUN_URL/api/job-status/:jobId
  */
 
 const corsHeaders = {
@@ -10,9 +10,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-function jsonRes(res, status, data) {
-  res.setHeader('Content-Type', 'application/json');
+function setCors(res) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+}
+
+function jsonRes(res, status, data) {
+  setCors(res);
+  res.setHeader('Content-Type', 'application/json');
   res.status(status).json(data);
 }
 
@@ -27,27 +31,37 @@ export default async function handler(req, res) {
     return jsonRes(res, 405, { error: 'Method not allowed' });
   }
 
-  const cloudRunUrl = process.env.CLOUD_RUN_URL?.replace(/\/$/, '');
+  const cloudRunUrl = (process.env.CLOUD_RUN_URL || '').replace(/\/$/, '');
   if (!cloudRunUrl) {
-    return jsonRes(res, 500, { error: 'Cloud Run URL not configured' });
+    console.error('[job-status] CLOUD_RUN_URL not configured');
+    return jsonRes(res, 500, { error: 'Backend URL not configured' });
   }
 
   const jobId = req.query.jobId;
-  if (!jobId || typeof jobId !== 'string') {
+  if (!jobId || typeof jobId !== 'string' || !jobId.trim()) {
     return jsonRes(res, 400, { error: 'jobId query parameter is required' });
   }
 
+  const targetUrl = `${cloudRunUrl}/api/job-status/${encodeURIComponent(jobId)}`;
+  console.log('[job-status] Proxying to backend:', targetUrl);
+
   try {
-    const response = await fetch(`${cloudRunUrl}/api/job-status/${encodeURIComponent(jobId)}`, {
+    const response = await fetch(targetUrl, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
 
+    const text = await response.text();
+    console.log('[job-status] Backend status:', response.status, 'response length:', text?.length);
+
     let data;
     try {
-      data = await response.json();
+      data = JSON.parse(text);
     } catch {
-      return jsonRes(res, 502, { error: 'Invalid response from backend' });
+      console.error('[job-status] Backend returned non-JSON. Response text:', text?.slice(0, 500));
+      return jsonRes(res, 502, {
+        error: `Backend returned invalid JSON (status ${response.status}). ${(text || 'empty').slice(0, 150)}`,
+      });
     }
 
     if (!response.ok) {
@@ -58,9 +72,9 @@ export default async function handler(req, res) {
 
     return jsonRes(res, 200, data);
   } catch (err) {
-    console.error('job-status error:', err.message);
+    console.error('[job-status] Proxy error:', err.message);
     return jsonRes(res, 500, {
-      error: err.message || 'Failed to connect to analysis service',
+      error: err.message || 'Failed to connect to backend',
     });
   }
 }
