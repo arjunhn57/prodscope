@@ -192,7 +192,6 @@ svg{flex-shrink:0;}
 
 <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
 
-<!-- ═══════ SIDEBAR ═══════ -->
 <aside class="sidebar" id="sidebar">
   <div class="sb-logo" onclick="location.href='index.html'">
     <div class="sb-logo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg></div>
@@ -214,7 +213,6 @@ svg{flex-shrink:0;}
   </div>
 </aside>
 
-<!-- ═══════ MAIN CONTENT ═══════ -->
 <div class="main">
   <header class="topbar">
     <div class="tb-left">
@@ -227,13 +225,11 @@ svg{flex-shrink:0;}
     </div>
   </header>
 
-  <!-- ═══════ ANALYSIS FORM PAGE ═══════ -->
   <div class="page active" id="page-analyze">
     <div class="page-content">
       <div class="page-title">New Deep Analysis</div>
       <div class="page-sub">Upload your Android build. Our AI will install it, crawl every screen, detect bugs, and generate a full UX audit — delivered to your inbox in 5-10 minutes.</div>
 
-      <!-- CARD 1: APK UPLOAD -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
@@ -258,7 +254,6 @@ svg{flex-shrink:0;}
         </div>
       </div>
 
-      <!-- CARD 2: DEMO CREDENTIALS -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
@@ -286,7 +281,6 @@ svg{flex-shrink:0;}
         </div>
       </div>
 
-      <!-- CARD 3: GOLDEN PATH + PAIN POINTS -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
@@ -307,7 +301,6 @@ svg{flex-shrink:0;}
         </div>
       </div>
 
-      <!-- CARD 4: ANALYSIS GOALS -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
@@ -327,7 +320,6 @@ svg{flex-shrink:0;}
         </div>
       </div>
 
-      <!-- CARD 5: EMAIL FOR REPORT -->
       <div class="card">
         <div class="card-head">
           <div class="ch-icon chi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg></div>
@@ -343,7 +335,6 @@ svg{flex-shrink:0;}
         </div>
       </div>
 
-      <!-- ACTION -->
       <div class="divider"></div>
       <div class="action-row">
         <div class="action-hint">
@@ -358,7 +349,6 @@ svg{flex-shrink:0;}
     </div>
   </div>
 
-  <!-- ═══════ JOB STATUS PAGE ═══════ -->
   <div class="page" id="page-job">
     <div class="page-content" style="max-width:600px;padding-top:48px;">
       <div class="job-card">
@@ -415,7 +405,6 @@ svg{flex-shrink:0;}
     </div>
   </div>
 
-  <!-- ═══════ PLACEHOLDER PAGES ═══════ -->
   <div class="page" id="page-history">
     <div class="ph active"><div class="ph-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="ph-t">Analysis History</div><div class="ph-s">Your past analyses will appear here. Run your first deep analysis to get started.</div></div>
   </div>
@@ -431,260 +420,264 @@ svg{flex-shrink:0;}
 </div>
 
 <script>
-/* ═══════ SIDEBAR & NAV ═══════ */
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sbOverlay').classList.toggle('show');}
-function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show');}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sbOverlay').classList.toggle('show');
+}
 
-const pageNames={analyze:'New Analysis',history:'History',ux:'UX Reports',growth:'Growth Plans',settings:'Settings',job:'Analysis Running'};
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sbOverlay').classList.remove('show');
+}
+
+const pageNames = {
+  analyze:'New Analysis',
+  history:'History',
+  ux:'UX Reports',
+  growth:'Growth Plans',
+  settings:'Settings',
+  job:'Analysis Running'
+};
+
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('page-' + id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
-  const nav=document.getElementById('nav-'+id);if(nav)nav.classList.add('active');
-  document.getElementById('topCrumb').textContent=pageNames[id]||id;
+  const nav = document.getElementById('nav-' + id);
+  if(nav) nav.classList.add('active');
+  document.getElementById('topCrumb').textContent = pageNames[id] || id;
   closeSidebar();
 }
 
-/* ═══════ FILE HANDLING ═══════ */
-let uploadedFile=null;
-const dropZone=document.getElementById('dropZone');
+let uploadedFile = null;
+const dropZone = document.getElementById('dropZone');
 
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop',e=>{
-  e.preventDefault();dropZone.classList.remove('drag-over');
-  const f=e.dataTransfer.files[0];
-  if(f&&(f.name.endsWith('.apk')||f.name.endsWith('.aab'))){setFile(f);}
-  else{alert('Please upload an .apk or .aab file');}
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f && (f.name.endsWith('.apk') || f.name.endsWith('.aab'))){
+    setFile(f);
+  } else {
+    alert('Please upload an .apk or .aab file');
+  }
 });
 
 function handleFile(input){
-  const f=input.files[0];
-  if(f){setFile(f);}
+  const f = input.files[0];
+  if(f) setFile(f);
 }
 
 function setFile(f){
-  uploadedFile=f;
-  document.getElementById('fileName').textContent=f.name;
-  document.getElementById('fileSize').textContent=(f.size/1024/1024).toFixed(1)+' MB';
+  uploadedFile = f;
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileSize').textContent = (f.size / 1024 / 1024).toFixed(1) + ' MB';
   document.getElementById('filePrev').classList.add('show');
-  dropZone.style.display='none';
+  dropZone.style.display = 'none';
 }
 
 function removeFile(){
-  uploadedFile=null;
+  uploadedFile = null;
   document.getElementById('filePrev').classList.remove('show');
-  dropZone.style.display='block';
-  document.getElementById('apkFile').value='';
+  dropZone.style.display = 'block';
+  document.getElementById('apkFile').value = '';
 }
 
-/* ═══════ JOB TIMER ═══════ */
-let timerInterval=null;
-let timerSeconds=0;
+let timerInterval = null;
+let timerSeconds = 0;
 
 function startTimer(){
-  timerSeconds=0;
+  timerSeconds = 0;
   updateTimerDisplay();
-  timerInterval=setInterval(()=>{
+  timerInterval = setInterval(() => {
     timerSeconds++;
     updateTimerDisplay();
-  },1000);
+  }, 1000);
 }
 
 function stopTimer(){
-  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  if(timerInterval){
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
 }
 
 function updateTimerDisplay(){
-  const m=Math.floor(timerSeconds/60).toString().padStart(2,'0');
-  const s=(timerSeconds%60).toString().padStart(2,'0');
-  document.getElementById('jobTimer').textContent=m+':'+s;
+  const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+  const s = (timerSeconds % 60).toString().padStart(2, '0');
+  document.getElementById('jobTimer').textContent = m + ':' + s;
 }
 
-/* ═══════ JOB STEPS ═══════ */
 function resetJobSteps(){
-  for(let i=1;i<=6;i++){
-    const el=document.getElementById('js'+i);
-    el.classList.remove('active','done','failed');
-    const jn=document.getElementById('jn'+i);
-    jn.textContent=i;
-    jn.innerHTML=i;
+  for(let i = 1; i <= 6; i++){
+    const el = document.getElementById('js' + i);
+    el.classList.remove('active', 'done', 'failed');
+    const jn = document.getElementById('jn' + i);
+    jn.innerHTML = i;
   }
-  document.getElementById('js1Detail').textContent='Transferring to secure cloud';
-  document.getElementById('uploadProgressBar').style.display='none';
-  document.getElementById('uploadProgressFill').style.width='0%';
+  document.getElementById('js1Detail').textContent = 'Transferring to secure cloud';
+  document.getElementById('uploadProgressBar').style.display = 'none';
+  document.getElementById('uploadProgressFill').style.width = '0%';
 }
 
-function setJobStep(step,state){
-  const el=document.getElementById('js'+step);
-  el.classList.remove('active','done','failed');
+function setJobStep(step, state){
+  const el = document.getElementById('js' + step);
+  el.classList.remove('active', 'done', 'failed');
   el.classList.add(state);
-  const jn=document.getElementById('jn'+step);
-  if(state==='done'){
-    jn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  const jn = document.getElementById('jn' + step);
+  if(state === 'done'){
+    jn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
   } else {
-    jn.textContent=step;
+    jn.textContent = step;
   }
 }
 
 function setUploadProgress(pct){
-  const bar=document.getElementById('uploadProgressBar');
-  const fill=document.getElementById('uploadProgressFill');
-  const detail=document.getElementById('js1Detail');
-  bar.style.display='block';
-  fill.style.width=pct+'%';
-  detail.textContent='Uploading… '+Math.round(pct)+'%';
+  const bar = document.getElementById('uploadProgressBar');
+  const fill = document.getElementById('uploadProgressFill');
+  const detail = document.getElementById('js1Detail');
+  bar.style.display = 'block';
+  fill.style.width = pct + '%';
+  detail.textContent = 'Uploading… ' + Math.round(pct) + '%';
 }
 
-/* ═══════ UPLOAD TO GCS VIA SIGNED URL ═══════ */
-function uploadToSignedUrl(url,file,onProgress){
-  return new Promise((resolve,reject)=>{
-    const xhr=new XMLHttpRequest();
-    xhr.open('PUT',url);
-    xhr.setRequestHeader('Content-Type','application/vnd.android.package-archive');
-
-    xhr.upload.addEventListener('progress',e=>{
-      if(e.lengthComputable&&onProgress){
-        onProgress((e.loaded/e.total)*100);
-      }
-    });
-
-    xhr.onload=()=>{
-      if(xhr.status>=200&&xhr.status<300)resolve();
-      else reject(new Error('Upload failed: '+xhr.status));
-    };
-    xhr.onerror=()=>reject(new Error('Upload failed'));
-    xhr.send(file);
-  });
-}
-
-/* ═══════ POLL JOB STATUS ═══════ */
-let pollInterval=null;
+let pollInterval = null;
+const API_BASE = 'http://34.10.240.173:8080';
 
 function pollJobStatus(jobId){
-  pollInterval=setInterval(async()=>{
+  pollInterval = setInterval(async () => {
     try{
-      const res=await fetch('/api/job-status?jobId='+encodeURIComponent(jobId));
-      const data=await res.json();
+      const res = await fetch(API_BASE + '/api/job-status/' + encodeURIComponent(jobId));
+      const data = await res.json();
 
       if(!res.ok){
-        console.error('Job status error:',data.error);
+        console.error('Job status error:', data.error);
         return;
       }
 
-      const status=data.status||data.state||'';
-      const currentStep=data.currentStep!=null?data.currentStep:data.step;
+      const status = data.status || '';
+      const currentStep = typeof data.step === 'number' ? data.step : 1;
 
-      if(status==='complete'||status==='completed'||status==='success'){
+      if(status === 'complete' || status === 'completed' || status === 'success'){
         stopPolling();
         stopTimer();
-        for(let i=1;i<=6;i++)setJobStep(i,'done');
+        for(let i = 1; i <= 6; i++) setJobStep(i, 'done');
         document.getElementById('jobOrb').classList.add('done');
-        document.getElementById('jobTitle').textContent='Report Sent!';
-        document.getElementById('jobSub').textContent='Check your inbox — your full analysis report has been emailed.';
+        document.getElementById('jobTitle').textContent = 'Report Sent!';
+        document.getElementById('jobSub').textContent = 'Check your inbox — your full analysis report has been emailed.';
         return;
       }
 
-      if(status==='failed'||status==='error'){
+      if(status === 'failed' || status === 'error'){
         stopPolling();
         stopTimer();
-        const activeStep=Math.min(Math.max(currentStep||2,1),6);
-        for(let i=1;i<activeStep;i++)setJobStep(i,'done');
-        setJobStep(activeStep,'failed');
+        const activeStep = Math.min(Math.max(currentStep || 2, 1), 6);
+        for(let i = 1; i < activeStep; i++) setJobStep(i, 'done');
+        setJobStep(activeStep, 'failed');
         document.getElementById('jobOrb').classList.add('done');
-        document.getElementById('jobTitle').textContent='Analysis Failed';
-        document.getElementById('jobSub').textContent=(data.error||data.message||'Something went wrong. Please try again.').slice(0,120);
+        document.getElementById('jobTitle').textContent = 'Analysis Failed';
+        document.getElementById('jobSub').textContent = (data.error || data.message || 'Something went wrong. Please try again.').slice(0, 120);
         return;
       }
 
-      if(typeof currentStep==='number'){
-        const step=Math.min(Math.max(currentStep,1),6);
-        for(let i=1;i<step;i++)setJobStep(i,'done');
-        setJobStep(step,'active');
-      }
+      const step = Math.min(Math.max(currentStep, 1), 6);
+      for(let i = 1; i < step; i++) setJobStep(i, 'done');
+      setJobStep(step, 'active');
     }catch(err){
-      console.error('Poll error:',err);
+      console.error('Poll error:', err);
     }
-  },5000);
+  }, 5000);
 }
 
 function stopPolling(){
-  if(pollInterval){clearInterval(pollInterval);pollInterval=null;}
+  if(pollInterval){
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
 }
 
-/* ═══════ START ANALYSIS ═══════ */
 async function startAnalysis(){
   if(!uploadedFile){
     alert('Please upload an APK or AAB file.');
     return;
   }
-  const email=document.getElementById('reportEmail').value.trim();
-  if(!email||!email.includes('@')){
+
+  const email = document.getElementById('reportEmail').value.trim();
+  if(!email || !email.includes('@')){
     alert('Please enter a valid email address to receive your report.');
     return;
   }
 
-  const goals=[...document.querySelectorAll('.g-chip.on')].map(c=>c.textContent.trim()).join(', ');
-  const painPoints=document.getElementById('painPoints').value||'';
-  const goldenPath=document.getElementById('goldenPath').value||'';
-  const credUser=document.getElementById('credUser').value||'';
-  const credPass=document.getElementById('credPass').value||'';
-  const credentials={username:credUser,password:credPass};
+  const goals = [...document.querySelectorAll('.g-chip.on')].map(c => c.textContent.trim()).join(', ');
+  const painPoints = document.getElementById('painPoints').value || '';
+  const goldenPath = document.getElementById('goldenPath').value || '';
+  const credUser = document.getElementById('credUser').value || '';
+  const credPass = document.getElementById('credPass').value || '';
+  const credentials = { username: credUser, password: credPass };
 
-  const btn=document.getElementById('analyzeBtn');
-  btn.disabled=true;
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
 
-  document.getElementById('jobEmail').textContent=email;
+  document.getElementById('jobEmail').textContent = email;
   document.getElementById('jobOrb').classList.remove('done');
-  document.getElementById('jobTitle').textContent='Analysis in Progress';
-  document.getElementById('jobSub').textContent='Our AI is installing and testing your app right now';
+  document.getElementById('jobTitle').textContent = 'Analysis in Progress';
+  document.getElementById('jobSub').textContent = 'Our AI is installing and testing your app right now';
   resetJobSteps();
-  setJobStep(1,'active');
+  setJobStep(1, 'active');
   startTimer();
   showPage('job');
 
   try{
-    const base=window.location.origin||'';
-    const uploadRes=await fetch(base+'/api/upload-url',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({fileName:uploadedFile.name,fileSize:uploadedFile.size})
-    });
-    const uploadData=await uploadRes.json();
-    if(!uploadRes.ok){
-      throw new Error(uploadData.error||'Failed to get upload URL');
-    }
-    const {uploadUrl,fileKey}=uploadData;
+    const formData = new FormData();
+    formData.append('apk', uploadedFile);
+    formData.append('email', email);
+    formData.append('credentials', JSON.stringify(credentials));
+    formData.append('goldenPath', goldenPath);
+    formData.append('painPoints', painPoints);
+    formData.append('goals', goals);
 
-    await uploadToSignedUrl(uploadUrl,uploadedFile,pct=>setUploadProgress(pct));
-    setJobStep(1,'done');
-    setJobStep(2,'active');
-    document.getElementById('js1Detail').textContent='Upload complete';
-    document.getElementById('uploadProgressBar').style.display='none';
+    setUploadProgress(30);
 
-    const startRes=await fetch(base+'/api/start-analysis',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        fileKey,email,credentials,goldenPath,painPoints,goals
-      })
+    const startRes = await fetch(API_BASE + '/api/start-job', {
+      method: 'POST',
+      body: formData
     });
-    const startData=await startRes.json();
+
+    setUploadProgress(100);
+
+    const startData = await startRes.json();
+
     if(!startRes.ok){
-      throw new Error(startData.error||'Failed to start analysis');
+      throw new Error(startData.error || 'Failed to start analysis');
     }
-    const {jobId}=startData;
 
+    setJobStep(1, 'done');
+    setJobStep(2, 'active');
+    document.getElementById('js1Detail').textContent = 'Upload complete';
+    document.getElementById('uploadProgressBar').style.display = 'none';
+
+    const jobId = startData.jobId;
     pollJobStatus(jobId);
   }catch(err){
     stopTimer();
     stopPolling();
-    setJobStep(1,'failed');
+    setJobStep(1, 'failed');
     document.getElementById('jobOrb').classList.add('done');
-    document.getElementById('jobTitle').textContent='Analysis Failed';
-    document.getElementById('jobSub').textContent=(err.message||'Something went wrong. Please try again.').slice(0,120);
+    document.getElementById('jobTitle').textContent = 'Analysis Failed';
+    document.getElementById('jobSub').textContent = (err.message || 'Something went wrong. Please try again.').slice(0, 120);
+    console.error(err);
   }finally{
-    btn.disabled=false;
+    btn.disabled = false;
   }
 }
 
@@ -692,10 +685,11 @@ function startNew(){
   stopTimer();
   stopPolling();
   removeFile();
-  document.getElementById('painPoints').value='';
-  document.getElementById('goldenPath').value='';
-  document.getElementById('credUser').value='';
-  document.getElementById('credPass').value='';
+  document.getElementById('painPoints').value = '';
+  document.getElementById('goldenPath').value = '';
+  document.getElementById('credUser').value = '';
+  document.getElementById('credPass').value = '';
+  document.getElementById('reportEmail').value = '';
   showPage('analyze');
 }
 </script>
