@@ -4,10 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node dev-server.mjs",
-    "dev": "node dev-server.mjs"
-  },
-  "dependencies": {
-    "form-data": "^4.0.0",
-    "formidable": "^3.5.1"
+    "dev": "node dev-server.mjs",
+    "test": "npm test --prefix prodscope-backend"
   }
 }

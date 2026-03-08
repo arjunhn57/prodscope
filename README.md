@@ -10,14 +10,6 @@ prodscope/
 ├── app.html                      # Analysis SPA (mock mode + live mode)
 ├── dev-server.mjs                # Local dev server — serves static files + proxies API to backend VM
 ├── package.json                  # Root package: dev-server deps + scripts
-├── vercel.json                   # Vercel deployment config
-│
-├── api/                          # Vercel serverless functions (Edge deployment)
-│   ├── start-job.js              #   Proxy multipart APK upload → backend
-│   ├── job-status.js             #   Proxy job polling → backend
-│   ├── start-analysis.js         #   Trigger analysis via GCS file key
-│   ├── upload-url.js             #   Generate signed GCS upload URL
-│   └── analyze.js                #   Direct Claude API proxy
 │
 └── prodscope-backend/            # Express backend (runs on GCE VM)
     ├── index.js                  #   Orchestrator: emulator → crawl → analyze → report → email
@@ -100,14 +92,7 @@ npm test
 | `PORT` | | Backend port (default: `8080`) |
 | `USE_CRAWLER_V1` | | `true` (default) for new crawler, `false` for legacy random-tap |
 
-### Frontend / Vercel (`api/.env`)
-| Variable | Required | Description |
-|---|---|---|
-| `CLOUD_RUN_URL` | ✅ | Backend URL (e.g. `http://34.10.240.173:8080`) |
-| `GCS_SERVICE_ACCOUNT_KEY` | | Base64-encoded GCS service account JSON |
-| `ANTHROPIC_API_KEY` | | For direct `/api/analyze` proxy |
-
-### Dev Server
+### Dev Server (`.env`)
 | Variable | Description |
 |---|---|
 | `BACKEND_BASE` | Override backend URL (default: `http://34.10.240.173:8080`) |
