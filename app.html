@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="data:,"/>
 <title>ProdScope — Automated Android App Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -439,6 +440,21 @@ const pageNames = {
   job:'Analysis Running'
 };
 
+const API_BASE = window.location.origin; // Temporary local build/testing mode: localhost dev server proxies to the VM backend.
+
+function normalizeMessage(value, fallback){
+  if(typeof value !== 'string') return fallback;
+  const message = value.replace(/\s+/g, ' ').trim();
+  return message || fallback;
+}
+
+function getErrorMessage(payload, fallback){
+  if(payload && typeof payload === 'object'){
+    return normalizeMessage(payload.error || payload.message, fallback);
+  }
+  return normalizeMessage(payload, fallback);
+}
+
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
@@ -551,23 +567,35 @@ function setUploadProgress(pct){
   detail.textContent = 'Uploading… ' + Math.round(pct) + '%';
 }
 
+function failJobState(message, activeStep = 1){
+  stopPolling();
+  stopTimer();
+  const step = Math.min(Math.max(activeStep, 1), 6);
+  for(let i = 1; i < step; i++) setJobStep(i, 'done');
+  setJobStep(step, 'failed');
+  document.getElementById('jobOrb').classList.add('done');
+  document.getElementById('jobTitle').textContent = 'Analysis Failed';
+  document.getElementById('jobSub').textContent = normalizeMessage(message, 'Something went wrong. Please try again.').slice(0, 120);
+}
+
 let pollInterval = null;
 
 function pollJobStatus(jobId){
+  stopPolling();
   pollInterval = setInterval(async () => {
     try{
-      const res = await fetch('/api/job-status?jobId=' + encodeURIComponent(jobId));
+      const res = await fetch(`${API_BASE}/api/job-status/${encodeURIComponent(jobId)}`);
       const text = await res.text();
       let data;
       try {
         data = text ? JSON.parse(text) : {};
       } catch (e) {
-        console.error('Job status non-JSON response:', text?.slice(0, 200));
+        failJobState('Received an invalid status response from the backend.', 2);
         return;
       }
 
       if(!res.ok){
-        console.error('Job status error:', data?.error);
+        failJobState(getErrorMessage(data, text || `Failed to fetch job status (${res.status})`), 2);
         return;
       }
 
@@ -586,14 +614,8 @@ function pollJobStatus(jobId){
       }
 
       if(status === 'failed' || status === 'error'){
-        stopPolling();
-        stopTimer();
         const activeStep = Math.min(Math.max(currentStep || 2, 1), 6);
-        for(let i = 1; i < activeStep; i++) setJobStep(i, 'done');
-        setJobStep(activeStep, 'failed');
-        document.getElementById('jobOrb').classList.add('done');
-        document.getElementById('jobTitle').textContent = 'Analysis Failed';
-        document.getElementById('jobSub').textContent = (data.error || data.message || 'Something went wrong. Please try again.').slice(0, 120);
+        failJobState(getErrorMessage(data, 'Something went wrong. Please try again.'), activeStep);
         return;
       }
 
@@ -601,7 +623,7 @@ function pollJobStatus(jobId){
       for(let i = 1; i < step; i++) setJobStep(i, 'done');
       setJobStep(step, 'active');
     }catch(err){
-      console.error('Poll error:', err);
+      failJobState('Lost connection while checking job status.', 2);
     }
   }, 5000);
 }
@@ -641,6 +663,7 @@ async function startAnalysis(){
   document.getElementById('jobSub').textContent = 'Our AI is installing and testing your app right now';
   resetJobSteps();
   setJobStep(1, 'active');
+  stopTimer();
   startTimer();
   showPage('job');
 
@@ -656,7 +679,7 @@ async function startAnalysis(){
     setUploadProgress(0);
     const jobId = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/start-job');
+      xhr.open('POST', `${API_BASE}/api/start-job`);
       xhr.upload.addEventListener('progress', e => {
         if(e.lengthComputable) setUploadProgress((e.loaded / e.total) * 100);
       });
@@ -666,7 +689,8 @@ async function startAnalysis(){
         try {
           data = respText ? JSON.parse(respText) : {};
         } catch (e) {
-          const errMsg = xhr.status >= 400 ? `Server error (${xhr.status}): ${respText.slice(0, 150)}` : 'Invalid response from server';
+          const fallback = xhr.status >= 400 ? `Server error (${xhr.status})` : 'Invalid response from backend';
+          const errMsg = getErrorMessage(respText, fallback);
           return reject(new Error(errMsg));
         }
         if(xhr.status >= 200 && xhr.status < 300){
@@ -676,23 +700,17 @@ async function startAnalysis(){
           document.getElementById('uploadProgressBar').style.display = 'none';
           resolve(data.jobId);
         } else {
-          reject(new Error(data.error || data.message || `Failed to start analysis (${xhr.status})`));
+          reject(new Error(getErrorMessage(data, `Failed to start analysis (${xhr.status})`)));
         }
       };
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onerror = () => reject(new Error('Upload failed. Check that the local dev server is running on localhost:3000.'));
       xhr.send(formData);
     });
 
     if(!jobId) throw new Error('No job ID returned');
     pollJobStatus(jobId);
   }catch(err){
-    stopTimer();
-    stopPolling();
-    setJobStep(1, 'failed');
-    document.getElementById('jobOrb').classList.add('done');
-    document.getElementById('jobTitle').textContent = 'Analysis Failed';
-    document.getElementById('jobSub').textContent = (err.message || 'Something went wrong. Please try again.').slice(0, 120);
-    console.error(err);
+    failJobState(err.message, 1);
   }finally{
     btn.disabled = false;
   }
