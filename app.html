@@ -455,6 +455,208 @@ function getErrorMessage(payload, fallback){
   return normalizeMessage(payload, fallback);
 }
 
+function sleep(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function readMockToggle(){
+  const mockParam = new URLSearchParams(window.location.search).get('mock');
+  if(mockParam == null) return true;
+  return !['0', 'false', 'off', 'no'].includes(mockParam.toLowerCase());
+}
+
+function createApiError(message, status = 500, data = null){
+  const error = new Error(normalizeMessage(message, 'Something went wrong. Please try again.'));
+  error.status = status;
+  error.data = data;
+  return error;
+}
+
+async function fetchJson(url){
+  const res = await fetch(url);
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw createApiError('Received an invalid response from the backend.', res.status);
+  }
+
+  if(!res.ok){
+    throw createApiError(getErrorMessage(data, text || `Request failed (${res.status})`), res.status, data);
+  }
+
+  return data;
+}
+
+function uploadWithXhr(url, formData, onUploadProgress){
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    if(onUploadProgress){
+      xhr.upload.addEventListener('progress', e => {
+        if(e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
+      });
+    }
+    xhr.onload = () => {
+      const respText = xhr.responseText || '';
+      let data;
+      try {
+        data = respText ? JSON.parse(respText) : {};
+      } catch (e) {
+        const fallback = xhr.status >= 400 ? `Server error (${xhr.status})` : 'Invalid response from backend';
+        return reject(createApiError(getErrorMessage(respText, fallback), xhr.status));
+      }
+
+      if(xhr.status >= 200 && xhr.status < 300){
+        resolve(data);
+      } else {
+        reject(createApiError(getErrorMessage(data, `Failed to start analysis (${xhr.status})`), xhr.status, data));
+      }
+    };
+    xhr.onerror = () => reject(createApiError('Upload failed. Check that the local dev server is running on localhost:3000.'));
+    xhr.send(formData);
+  });
+}
+
+const USE_MOCK = readMockToggle();
+const POLL_INTERVAL_MS = USE_MOCK ? 1200 : 5000;
+
+if(USE_MOCK){
+  console.info('[ProdScope] Mock mode active');
+}
+
+const mockJobs = new Map();
+const MOCK_STAGES = [
+  { afterMs: 0, status: 'queued', step: 1 },
+  { afterMs: 2600, status: 'processing', step: 1 },
+  { afterMs: 6600, status: 'processing', step: 2 },
+  { afterMs: 10800, status: 'processing', step: 3 },
+  { afterMs: 14800, status: 'processing', step: 4 },
+  { afterMs: 18800, status: 'processing', step: 5 },
+  { afterMs: 22800, status: 'complete', step: 5 }
+];
+
+function createMockReport(job){
+  return JSON.stringify({
+    overall_score: 84,
+    summary: `Mock analysis for ${job.fileName} found a few UX issues and medium-priority bugs in the ${job.goldenPath || 'core flow'}.`,
+    critical_bugs: [
+      'Primary CTA appears below the fold on smaller devices during onboarding.',
+      'Checkout confirmation state lacks a clear success affordance after payment.'
+    ],
+    ux_issues: [
+      'New users have too much copy to scan before the first meaningful action.',
+      'Search results feel dense and make comparison harder than it should be.'
+    ],
+    suggestions: [
+      'Reduce friction in onboarding by revealing one key action at a time.',
+      'Make the checkout summary sticky to reinforce confidence before payment.'
+    ],
+    quick_wins: [
+      'Increase contrast on helper text inside form fields.',
+      'Tighten empty-state copy so users understand the next step immediately.'
+    ],
+    detailed_findings: [
+      {
+        area: 'Onboarding',
+        severity: 'medium',
+        finding: 'The sign-up flow asks for too much context before showing value.'
+      },
+      {
+        area: 'Checkout',
+        severity: 'medium',
+        finding: 'The review screen does not emphasize price, timing, and confirmation strongly enough.'
+      }
+    ],
+    email: job.email,
+    goals: job.goals,
+    generatedAt: new Date().toISOString()
+  }, null, 2);
+}
+
+function createMockJob(formData){
+  const file = formData.get('apk');
+  return {
+    createdAt: Date.now(),
+    email: formData.get('email') || '',
+    credentials: formData.get('credentials') || '{}',
+    goldenPath: formData.get('goldenPath') || '',
+    painPoints: formData.get('painPoints') || '',
+    goals: formData.get('goals') || '',
+    fileName: file && typeof file === 'object' && 'name' in file ? file.name : 'mock-build.apk',
+    steps: ['Uploading', 'Installing', 'Crawling', 'Analyzing', 'Generating Report', 'Sending Email'],
+    screenshots: ['mock://screen/home', 'mock://screen/search', 'mock://screen/checkout']
+  };
+}
+
+function getMockStage(job){
+  const elapsed = Date.now() - job.createdAt;
+  let stage = MOCK_STAGES[0];
+  for(const candidate of MOCK_STAGES){
+    if(elapsed >= candidate.afterMs){
+      stage = candidate;
+    } else {
+      break;
+    }
+  }
+  return stage;
+}
+
+async function simulateMockUpload(onUploadProgress){
+  const checkpoints = [6, 14, 27, 41, 56, 69, 82, 93, 100];
+  for(const pct of checkpoints){
+    if(onUploadProgress) onUploadProgress(pct);
+    await sleep(140 + Math.round(Math.random() * 120));
+  }
+}
+
+function createMockApi(){
+  return {
+    async startJob({ formData, onUploadProgress }){
+      await simulateMockUpload(onUploadProgress);
+      const jobId = `mock_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const job = createMockJob(formData);
+      job.jobId = jobId;
+      job.report = createMockReport(job);
+      mockJobs.set(jobId, job);
+      return { jobId, status: 'queued' };
+    },
+
+    async getJobStatus(jobId){
+      await sleep(180);
+      const job = mockJobs.get(jobId);
+      if(!job){
+        throw createApiError('Job not found', 404);
+      }
+
+      const stage = getMockStage(job);
+      return {
+        status: stage.status,
+        step: stage.step,
+        currentStep: stage.step,
+        steps: job.steps,
+        screenshots: stage.status === 'complete' ? job.screenshots : [],
+        report: stage.status === 'complete' ? job.report : null
+      };
+    }
+  };
+}
+
+function createLiveApi(baseUrl){
+  return {
+    startJob({ formData, onUploadProgress }){
+      return uploadWithXhr(`${baseUrl}/api/start-job`, formData, onUploadProgress);
+    },
+
+    getJobStatus(jobId){
+      return fetchJson(`${baseUrl}/api/job-status/${encodeURIComponent(jobId)}`);
+    }
+  };
+}
+
+const api = USE_MOCK ? createMockApi() : createLiveApi(API_BASE);
+
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
@@ -582,22 +784,9 @@ let pollInterval = null;
 
 function pollJobStatus(jobId){
   stopPolling();
-  pollInterval = setInterval(async () => {
+  const checkStatus = async () => {
     try{
-      const res = await fetch(`${API_BASE}/api/job-status/${encodeURIComponent(jobId)}`);
-      const text = await res.text();
-      let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (e) {
-        failJobState('Received an invalid status response from the backend.', 2);
-        return;
-      }
-
-      if(!res.ok){
-        failJobState(getErrorMessage(data, text || `Failed to fetch job status (${res.status})`), 2);
-        return;
-      }
+      const data = await api.getJobStatus(jobId);
 
       const status = data.status || data.state || '';
       const backendStep = data.currentStep != null ? data.currentStep : data.step;
@@ -623,9 +812,12 @@ function pollJobStatus(jobId){
       for(let i = 1; i < step; i++) setJobStep(i, 'done');
       setJobStep(step, 'active');
     }catch(err){
-      failJobState('Lost connection while checking job status.', 2);
+      failJobState(getErrorMessage(err && err.data, err && err.message ? err.message : 'Lost connection while checking job status.'), 2);
     }
-  }, 5000);
+  };
+
+  checkStatus();
+  pollInterval = setInterval(checkStatus, POLL_INTERVAL_MS);
 }
 
 function stopPolling(){
@@ -677,40 +869,21 @@ async function startAnalysis(){
     formData.append('goals', goals);
 
     setUploadProgress(0);
-    const jobId = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_BASE}/api/start-job`);
-      xhr.upload.addEventListener('progress', e => {
-        if(e.lengthComputable) setUploadProgress((e.loaded / e.total) * 100);
-      });
-      xhr.onload = () => {
-        const respText = xhr.responseText || '';
-        let data;
-        try {
-          data = respText ? JSON.parse(respText) : {};
-        } catch (e) {
-          const fallback = xhr.status >= 400 ? `Server error (${xhr.status})` : 'Invalid response from backend';
-          const errMsg = getErrorMessage(respText, fallback);
-          return reject(new Error(errMsg));
-        }
-        if(xhr.status >= 200 && xhr.status < 300){
-          setJobStep(1, 'done');
-          setJobStep(2, 'active');
-          document.getElementById('js1Detail').textContent = 'Upload complete';
-          document.getElementById('uploadProgressBar').style.display = 'none';
-          resolve(data.jobId);
-        } else {
-          reject(new Error(getErrorMessage(data, `Failed to start analysis (${xhr.status})`)));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Upload failed. Check that the local dev server is running on localhost:3000.'));
-      xhr.send(formData);
+    const startResult = await api.startJob({
+      formData,
+      onUploadProgress: setUploadProgress
     });
+    const jobId = startResult && startResult.jobId;
+
+    setJobStep(1, 'done');
+    setJobStep(2, 'active');
+    document.getElementById('js1Detail').textContent = 'Upload complete';
+    document.getElementById('uploadProgressBar').style.display = 'none';
 
     if(!jobId) throw new Error('No job ID returned');
     pollJobStatus(jobId);
   }catch(err){
-    failJobState(err.message, 1);
+    failJobState(getErrorMessage(err && err.data, err && err.message ? err.message : 'Something went wrong. Please try again.'), 1);
   }finally{
     btn.disabled = false;
   }
