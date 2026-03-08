@@ -43,7 +43,12 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return jsonRes(res, 502, { error: 'Invalid response from backend' });
+    }
 
     if (!response.ok) {
       return jsonRes(res, response.status, {

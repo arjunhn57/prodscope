@@ -551,30 +551,12 @@ function setUploadProgress(pct){
   detail.textContent = 'Uploading… ' + Math.round(pct) + '%';
 }
 
-function uploadToSignedUrl(url, file, onProgress){
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
-    xhr.upload.addEventListener('progress', e => {
-      if(e.lengthComputable && onProgress) onProgress((e.loaded / e.total) * 100);
-    });
-    xhr.onload = () => {
-      if(xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error('Upload failed: ' + xhr.status));
-    };
-    xhr.onerror = () => reject(new Error('Upload failed'));
-    xhr.send(file);
-  });
-}
-
 let pollInterval = null;
 
 function pollJobStatus(jobId){
   pollInterval = setInterval(async () => {
     try{
-      const base = window.location.origin || '';
-      const res = await fetch(base + '/api/job-status?jobId=' + encodeURIComponent(jobId));
+      const res = await fetch('/api/job-status?jobId=' + encodeURIComponent(jobId));
       const data = await res.json();
 
       if(!res.ok){
@@ -583,7 +565,8 @@ function pollJobStatus(jobId){
       }
 
       const status = data.status || data.state || '';
-      const currentStep = data.currentStep != null ? data.currentStep : data.step;
+      const backendStep = data.currentStep != null ? data.currentStep : data.step;
+      const currentStep = typeof backendStep === 'number' ? Math.max(backendStep + 1, 2) : 2;
 
       if(status === 'complete' || status === 'completed' || status === 'success'){
         stopPolling();
@@ -607,7 +590,7 @@ function pollJobStatus(jobId){
         return;
       }
 
-      const step = Math.min(Math.max(currentStep ?? 1, 1), 6);
+      const step = Math.min(Math.max(currentStep, 1), 6);
       for(let i = 1; i < step; i++) setJobStep(i, 'done');
       setJobStep(step, 'active');
     }catch(err){
@@ -655,37 +638,42 @@ async function startAnalysis(){
   showPage('job');
 
   try{
-    const base = window.location.origin || '';
-    const uploadRes = await fetch(base + '/api/upload-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: uploadedFile.name, fileSize: uploadedFile.size })
+    const formData = new FormData();
+    formData.append('apk', uploadedFile);
+    formData.append('email', email);
+    formData.append('credentials', JSON.stringify(credentials));
+    formData.append('goldenPath', goldenPath);
+    formData.append('painPoints', painPoints);
+    formData.append('goals', goals);
+
+    setUploadProgress(0);
+    const jobId = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/start-job');
+      xhr.upload.addEventListener('progress', e => {
+        if(e.lengthComputable) setUploadProgress((e.loaded / e.total) * 100);
+      });
+      xhr.onload = () => {
+        try{
+          const data = JSON.parse(xhr.responseText || '{}');
+          if(xhr.status >= 200 && xhr.status < 300){
+            setJobStep(1, 'done');
+            setJobStep(2, 'active');
+            document.getElementById('js1Detail').textContent = 'Upload complete';
+            document.getElementById('uploadProgressBar').style.display = 'none';
+            resolve(data.jobId);
+          } else {
+            reject(new Error(data.error || 'Failed to start analysis'));
+          }
+        } catch(e) {
+          reject(new Error('Invalid response from server'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.send(formData);
     });
-    const uploadData = await uploadRes.json();
-    if(!uploadRes.ok){
-      throw new Error(uploadData.error || 'Failed to get upload URL');
-    }
-    const { uploadUrl, fileKey } = uploadData;
 
-    await uploadToSignedUrl(uploadUrl, uploadedFile, pct => setUploadProgress(pct));
-    setJobStep(1, 'done');
-    setJobStep(2, 'active');
-    document.getElementById('js1Detail').textContent = 'Upload complete';
-    document.getElementById('uploadProgressBar').style.display = 'none';
-
-    const startRes = await fetch(base + '/api/start-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileKey, email, credentials, goldenPath, painPoints, goals
-      })
-    });
-    const startData = await startRes.json();
-
-    if(!startRes.ok){
-      throw new Error(startData.error || 'Failed to start analysis');
-    }
-    const jobId = startData.jobId;
+    if(!jobId) throw new Error('No job ID returned');
     pollJobStatus(jobId);
   }catch(err){
     stopTimer();
