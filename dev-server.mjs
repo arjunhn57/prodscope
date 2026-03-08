@@ -64,6 +64,7 @@ function proxyRequest(req, res, targetPath) {
   const targetUrl = `${BACKEND_BASE}${targetPath}`;
   const target = new URL(targetUrl);
   const transport = target.protocol === 'https:' ? https : http;
+  const isStartJob = targetPath === '/api/start-job';
 
   return new Promise((resolve) => {
     let settled = false;
@@ -91,6 +92,10 @@ function proxyRequest(req, res, targetPath) {
       resolve();
     };
 
+    if (isStartJob) {
+      console.log(`[dev-server] Proxying ${req.method} ${targetPath} -> ${targetUrl}`);
+    }
+
     const upstreamReq = transport.request(
       {
         protocol: target.protocol,
@@ -101,6 +106,10 @@ function proxyRequest(req, res, targetPath) {
         headers: getForwardHeaders(req.headers),
       },
       (upstreamRes) => {
+        if (isStartJob) {
+          console.log(`[dev-server] Upstream ${targetPath} responded with ${upstreamRes.statusCode || 502}`);
+        }
+
         copyUpstreamHeaders(upstreamRes, res);
         res.writeHead(upstreamRes.statusCode || 502, upstreamRes.statusMessage);
         upstreamRes.pipe(res);
