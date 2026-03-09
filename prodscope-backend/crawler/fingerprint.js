@@ -13,13 +13,17 @@ const crypto = require('crypto');
  */
 const STRUCTURAL_ATTRS = [
   'class',
+  'package',
   'resource-id',
   'text',
   'content-desc',
+  'checkable',
   'clickable',
-  'editable',       // custom, see normalize
-  'input-type',     // custom, see normalize
-  'package',
+  'enabled',
+  'focusable',
+  'scrollable',
+  'long-clickable',
+  'password'
 ];
 
 /**
@@ -42,10 +46,22 @@ function normalize(xml) {
     for (const attr of STRUCTURAL_ATTRS) {
       const attrMatch = attrString.match(new RegExp(`${attr}="([^"]*)"`));
       if (attrMatch) {
-        parts.push(`${attr}="${attrMatch[1]}"`);
+        let val = attrMatch[1];
+        
+        // Normalize text/desc/id to lower case and mask any numbers
+        // This prevents things like "10:45 AM" or "32 unread messages" from breaking the screen identity
+        if (['text', 'content-desc', 'resource-id'].includes(attr)) {
+          val = val.toLowerCase()
+                   .replace(/\d/g, '#')
+                   .replace(/\s*[ap]m\b/g, '') // strip am/pm suffixes
+                   .trim();
+        }
+        
+        parts.push(`${attr}="${val}"`);
       }
     }
     if (parts.length > 0) {
+      parts.sort(); // Sort attributes alphabetically to ensure deterministic order regardless of original XML order
       lines.push(parts.join(' '));
     }
   }

@@ -57,9 +57,9 @@ function scorePriority(action) {
     const desc = (action.contentDesc || '').toLowerCase();
     const rid = (action.resourceId || '').toLowerCase();
 
-    // Login/signup buttons get high priority
-    const loginKeywords = ['login', 'sign in', 'sign up', 'register', 'submit', 'continue', 'next', 'log in'];
-    if (loginKeywords.some(k => text.includes(k) || desc.includes(k) || rid.includes(k))) return 90;
+    // Primary CTAs (highest priority among taps)
+    const primaryKeywords = ['login', 'sign in', 'sign up', 'register', 'submit', 'continue', 'next', 'log in', 'get started', 'allow', 'done', 'finish'];
+    if (primaryKeywords.some(k => text.includes(k) || desc.includes(k) || rid.includes(k))) return 90;
 
     // Buttons with text
     if ((cls.includes('button') || cls.includes('textview')) && (text || desc)) return 80;
@@ -73,10 +73,16 @@ function scorePriority(action) {
     }
 
     // Generic clickable with some identifying info
-    if (text || desc || rid) return 50;
+    if (text || desc || rid.length > 3) return 50;
 
-    // Generic clickable
-    return 40;
+    // Junk elements (empty div, generic frame layout with no identifier)
+    if (action.bounds) {
+       const height = action.bounds.y2 - action.bounds.y1;
+       const width = action.bounds.x2 - action.bounds.x1;
+       if (height < 20 && width < 20) return -10; // Penalize tiny junk
+    }
+
+    return 20; // Lower baseline priority for bare generic elements
   }
 
   if (action.type === ACTION_TYPES.SCROLL_DOWN || action.type === ACTION_TYPES.SCROLL_UP) return 20;
@@ -108,10 +114,16 @@ function extract(xml, triedActions = new Set()) {
     const clickable = get('clickable') === 'true';
     const scrollable = get('scrollable') === 'true';
     const editable = get('class').toLowerCase().includes('edittext') || get('editable') === 'true';
+    const enabled = get('enabled') !== 'false';
     const boundsStr = get('bounds');
     const bounds = parseBounds(boundsStr);
+    const pkg = get('package').toLowerCase();
 
     if (!bounds) continue;
+    if (!enabled) continue; // Skip disabled elements
+
+    // Immediately skip system UI framework overlays to avoid random settings toggles or quick settings expansion
+    if (pkg === 'com.android.systemui' || pkg === 'com.android.settings') continue;
 
     // Skip off-screen or invisible elements (assuming 1080x1920 device)
     if (bounds.cx < 0 || bounds.cy < 0 || bounds.cx > 1200 || bounds.cy > 2400) continue;
