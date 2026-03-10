@@ -104,6 +104,34 @@ function waitForDevice(timeoutMs = 10000) {
   run('adb wait-for-device', { timeout: timeoutMs });
 }
 
+/**
+ * Check if an emulator/device is online and in 'device' state.
+ * Returns false for offline, empty device list, or errors.
+ */
+function isDeviceOnline() {
+  try {
+    const out = run('adb devices', { ignoreError: true });
+    const lines = out.split('\n').slice(1).map(s => s.trim()).filter(Boolean);
+    return lines.some(line => line.startsWith('emulator-') && line.endsWith('\tdevice'));
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Ensure the device is online AND fully booted.
+ * Returns true only when boot prop sys.boot_completed is '1'.
+ */
+function ensureDeviceReady() {
+  try {
+    if (!isDeviceOnline()) return false;
+    const boot = run('adb shell getprop sys.boot_completed', { ignoreError: true });
+    return boot.trim() === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 module.exports = {
   run,
   screencap,
@@ -119,4 +147,6 @@ module.exports = {
   listThirdPartyPackages,
   launchApp,
   waitForDevice,
+  isDeviceOnline,
+  ensureDeviceReady,
 };

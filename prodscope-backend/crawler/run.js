@@ -94,10 +94,25 @@ async function runCrawl(config) {
   let consecutiveNoNewState = 0;
   const MAX_NO_NEW_STATE = 5;
   let formFilledOnce = false;
+  let consecutiveDeviceFails = 0;
+  const MAX_DEVICE_FAILS = 3;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
     console.log(`\n[crawler] === Step ${step + 1}/${maxSteps} ===`);
+
+    // 0. Device health check — abort early if emulator disappeared
+    if (!adb.isDeviceOnline()) {
+      consecutiveDeviceFails++;
+      console.log(`  [crawler] Device offline (attempt ${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+      if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+        stopReason = 'device_offline';
+        break;
+      }
+      await sleep(3000);
+      continue;
+    }
+    consecutiveDeviceFails = 0;
 
     // 1. Capture current screen
     const snapshot = screen.capture(screenshotDir, step);

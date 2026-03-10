@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
@@ -20,7 +21,7 @@ const upload = multer({ dest: "/tmp/uploads/" });
 const jobs = {};
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 /** Feature flag: set USE_CRAWLER_V1=false to fall back to legacy inline crawl */
 const USE_CRAWLER_V1 = process.env.USE_CRAWLER_V1 !== "false";
@@ -79,27 +80,48 @@ async function processJob(jobId, apkPath, opts) {
 
     // Step 1: Start emulator
     execSync("sudo chmod 666 /dev/kvm", { stdio: "ignore" });
-    exec(
-      "emulator -avd prodscope-test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &",
-    );
-    execSync("adb wait-for-device");
+    try { execSync("adb kill-server", { stdio: "ignore" }); } catch (e) { }
+    try { execSync("pkill -f emulator", { stdio: "ignore" }); } catch (e) { }
+    try { execSync("pkill -f qemu-system-x86_64", { stdio: "ignore" }); } catch (e) { }
+    await sleep(2000);
 
-    // Wait for boot
+    exec(
+      "nohup emulator -avd prodscope-test -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > /tmp/prodscope-emulator.log 2>&1 &",
+    );
+
+    await sleep(8000);
+    try { execSync("adb start-server", { stdio: "ignore" }); } catch (e) { }
+
+    // Wait for emulator device to appear and finish booting
     let booted = false;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 120; i++) {
       try {
-        const result = execSync("adb shell getprop sys.boot_completed")
-          .toString()
-          .trim();
-        if (result === "1") {
-          booted = true;
-          break;
+        const devices = execSync("adb devices").toString();
+        const hasEmulator = devices.includes("emulator-") && !devices.includes("offline");
+
+        if (hasEmulator) {
+          const result = execSync("adb shell getprop sys.boot_completed")
+            .toString()
+            .trim();
+
+          if (result === "1") {
+            booted = true;
+            break;
+          }
         }
-      } catch (e) {}
+      } catch (e) { }
       await sleep(2000);
     }
-    if (!booted) throw new Error("Emulator failed to boot");
-    await sleep(5000);
+
+    if (!booted) {
+      let emuLog = "";
+      try {
+        emuLog = execSync("tail -n 80 /tmp/prodscope-emulator.log").toString();
+      } catch (e) { }
+      throw new Error("Emulator failed to boot. " + emuLog);
+    }
+
+    await sleep(10000);
 
     // Step 2: Install APK
     jobs[jobId].step = 2;
@@ -127,8 +149,8 @@ async function processJob(jobId, apkPath, opts) {
           .trim();
         execSync(
           "adb shell monkey -p " +
-            packageName +
-            " -c android.intent.category.LAUNCHER 1",
+          packageName +
+          " -c android.intent.category.LAUNCHER 1",
         );
       } catch (e) {
         console.log("Could not launch app:", e.message);
@@ -158,6 +180,24 @@ async function processJob(jobId, apkPath, opts) {
       jobs[jobId].crawlGraph = crawlResult.graph;
       jobs[jobId].crawlStats = crawlResult.stats;
       jobs[jobId].stopReason = crawlResult.stopReason;
+
+      // ── Truthful failure handling ──────────────────────────────────
+      const crawlStopReason = crawlResult.stopReason;
+      const isCrawlFailed = !screenshots || screenshots.length === 0 || crawlStopReason === 'device_offline';
+      const isCrawlDegraded = !isCrawlFailed && screenshots.length < 3;
+
+      if (isCrawlFailed) {
+        console.error(`Job ${jobId}: crawl failed — stopReason=${crawlStopReason}, screens=${screenshots ? screenshots.length : 0}`);
+        jobs[jobId].status = 'failed';
+        jobs[jobId].error = 'Crawl failed: ' + (crawlStopReason || 'no screens captured');
+        try { execSync('adb emu kill', { stdio: 'ignore' }); } catch (e) { }
+        return;
+      }
+
+      if (isCrawlDegraded) {
+        jobs[jobId].crawlQuality = 'degraded';
+        console.log(`Job ${jobId}: crawl degraded — only ${screenshots.length} screens captured`);
+      }
     } else {
       // ── Legacy crawl (preserved for A/B comparison) ─────────────────
       screenshots = await legacyCrawl(jobId, screenshotDir);
@@ -174,7 +214,7 @@ async function processJob(jobId, apkPath, opts) {
 
     // Step 6: Send email
     jobs[jobId].step = 6;
-    if (opts.email) {
+    if (opts.email && resend) {
       await resend.emails.send({
         from: "ProdScope <onboarding@resend.dev>",
         to: opts.email,
@@ -188,12 +228,12 @@ async function processJob(jobId, apkPath, opts) {
       });
     }
 
-    jobs[jobId].status = "complete";
+    jobs[jobId].status = jobs[jobId].crawlQuality === 'degraded' ? 'degraded' : 'complete';
 
     // Cleanup
     try {
       execSync("adb emu kill", { stdio: "ignore" });
-    } catch (e) {}
+    } catch (e) { }
     fs.unlinkSync(apkPath);
   } catch (err) {
     console.error("Job failed:", err);
@@ -201,7 +241,7 @@ async function processJob(jobId, apkPath, opts) {
     jobs[jobId].error = err.message;
     try {
       execSync("adb emu kill", { stdio: "ignore" });
-    } catch (e) {}
+    } catch (e) { }
   }
 }
 
@@ -209,47 +249,10 @@ async function processJob(jobId, apkPath, opts) {
 // Legacy crawl (preserved behind USE_CRAWLER_V1=false flag)
 // ---------------------------------------------------------------------------
 
-const clickables =
-  xmlDump.match(
-    /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*clickable="true"/g,
-  ) || [];
-
-if (clickables.length > 0) {
-  const parsed = clickables
-    .map((item) => {
-      const match = item.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
-      if (!match) return null;
-
-      const x1 = parseInt(match[1], 10);
-      const y1 = parseInt(match[2], 10);
-      const x2 = parseInt(match[3], 10);
-      const y2 = parseInt(match[4], 10);
-
-      return {
-        raw: item,
-        x1,
-        y1,
-        x2,
-        y2,
-        centerX: Math.floor((x1 + x2) / 2),
-        centerY: Math.floor((y1 + y2) / 2),
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => {
-      if (a.centerY !== b.centerY) return a.centerY - b.centerY;
-      return a.centerX - b.centerX;
-    });
-
-  const chosen = parsed[0];
-  if (chosen) {
-    execSync(`adb shell input tap ${chosen.centerX} ${chosen.centerY}`);
-    await sleep(2000);
-  }
-} else {
-  execSync("adb shell input swipe 540 1800 540 900 300");
-  await sleep(1500);
+async function legacyCrawl(jobId, screenshotDir) {
+  throw new Error("Legacy crawl is disabled in this VM build. Use crawler v1.");
 }
+
 // ---------------------------------------------------------------------------
 // Analysis helpers (extracted from inline for clarity, same logic)
 // ---------------------------------------------------------------------------
