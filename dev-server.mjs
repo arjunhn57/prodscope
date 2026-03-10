@@ -47,6 +47,11 @@ function getForwardHeaders(headers) {
     const lowerName = name.toLowerCase();
     if (lowerName === 'host') continue;
     if (HOP_BY_HOP_HEADERS.has(lowerName)) continue;
+
+    // Prevent cached polling responses for job-status requests
+    if (lowerName === 'if-none-match') continue;
+    if (lowerName === 'if-modified-since') continue;
+
     forwarded[name] = value;
   }
   return forwarded;
@@ -65,9 +70,13 @@ function proxyRequest(req, res, targetPath) {
   const target = new URL(targetUrl);
   const transport = target.protocol === 'https:' ? https : http;
   const isStartJob = targetPath === '/api/start-job';
+  const isStartStatus = targetPath.startsWith('/api/job-status/');
+  const isJobStatus = targetPath.startsWith('/api/job-status/');
 
   return new Promise((resolve) => {
     let settled = false;
+    let attempt = 0;
+    const maxAttempts = isJobStatus ? 3 : 1;
 
     const finish = () => {
       if (settled) return;
@@ -75,63 +84,143 @@ function proxyRequest(req, res, targetPath) {
       resolve();
     };
 
-    const failProxy = (error) => {
-      if (settled) return;
-      settled = true;
-      console.error(`[dev-server] Proxy failed for ${targetPath}:`, error.message);
+    const makeAttempt = () => {
+      attempt += 1;
 
-      if (!res.headersSent) {
-        writeJson(res, 502, {
-          error: `VM backend is unreachable at ${targetUrl}`,
-          details: error.message,
-        });
-      } else {
-        res.destroy(error);
+      if (isStartJob || isJobStatus) {
+        console.log(
+          `[dev-server] Proxying ${req.method} ${targetPath} -> ${targetUrl} (attempt ${attempt}/${maxAttempts})`
+        );
       }
 
-      resolve();
-    };
+      const upstreamReq = transport.request(
+        {
+          protocol: target.protocol,
+          hostname: target.hostname,
+          port: target.port || (target.protocol === 'https:' ? 443 : 80),
+          method: req.method,
+          path: `${target.pathname}${target.search}`,
+          headers: getForwardHeaders(req.headers),
+        },
+        (upstreamRes) => {
+          if (isStartJob || isJobStatus) {
+            console.log(
+              `[dev-server] Upstream ${targetPath} responded with ${upstreamRes.statusCode || 502}`
+            );
+          }
 
-    if (isStartJob) {
-      console.log(`[dev-server] Proxying ${req.method} ${targetPath} -> ${targetUrl}`);
-    }
+          copyUpstreamHeaders(upstreamRes, res);
 
-    const upstreamReq = transport.request(
-      {
-        protocol: target.protocol,
-        hostname: target.hostname,
-        port: target.port || (target.protocol === 'https:' ? 443 : 80),
-        method: req.method,
-        path: `${target.pathname}${target.search}`,
-        headers: getForwardHeaders(req.headers),
-      },
-      (upstreamRes) => {
-        if (isStartJob) {
-          console.log(`[dev-server] Upstream ${targetPath} responded with ${upstreamRes.statusCode || 502}`);
+          if (isJobStatus) {
+            res.setHeader('Cache-Control', 'no-store');
+            res.removeHeader('etag');
+          }
+
+          res.writeHead(upstreamRes.statusCode || 502, upstreamRes.statusMessage);
+          upstreamRes.pipe(res);
+
+          upstreamRes.on('error', (error) => {
+            if (
+              isJobStatus &&
+              !res.headersSent &&
+              attempt < maxAttempts &&
+              /ECONNRESET|socket hang up/i.test(error.message)
+            ) {
+              console.warn(
+                `[dev-server] Job-status upstream response error for ${targetPath}: ${error.message}. Retrying...`
+              );
+              setTimeout(makeAttempt, 500);
+              return;
+            }
+
+            if (!settled) {
+              settled = true;
+              console.error(`[dev-server] Proxy failed for ${targetPath}:`, error.message);
+
+              if (!res.headersSent) {
+                writeJson(res, 502, {
+                  error: `VM backend is unreachable at ${targetUrl}`,
+                  details: error.message,
+                });
+              } else {
+                res.destroy(error);
+              }
+
+              resolve();
+            }
+          });
+
+          res.on('finish', finish);
+          res.on('close', finish);
+        }
+      );
+
+      const timeoutMs = isJobStatus ? Math.max(PROXY_TIMEOUT_MS, 120000) : PROXY_TIMEOUT_MS;
+
+      upstreamReq.setTimeout(timeoutMs, () => {
+        upstreamReq.destroy(new Error(`Proxy request timed out after ${timeoutMs}ms`));
+      });
+
+      upstreamReq.on('error', (error) => {
+        const retryable =
+          isJobStatus &&
+          attempt < maxAttempts &&
+          /ECONNRESET|socket hang up/i.test(error.message);
+
+        if (retryable) {
+          console.warn(
+            `[dev-server] Proxy failed for ${targetPath}: ${error.message}. Retrying (${attempt}/${maxAttempts})...`
+          );
+          setTimeout(makeAttempt, 500);
+          return;
         }
 
-        copyUpstreamHeaders(upstreamRes, res);
-        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.statusMessage);
-        upstreamRes.pipe(res);
+        if (settled) return;
+        settled = true;
+        console.error(`[dev-server] Proxy failed for ${targetPath}:`, error.message);
 
-        upstreamRes.on('error', failProxy);
-        res.on('finish', finish);
-        res.on('close', finish);
+        if (!res.headersSent) {
+          writeJson(res, 502, {
+            error: `VM backend is unreachable at ${targetUrl}`,
+            details: error.message,
+          });
+        } else {
+          res.destroy(error);
+        }
+
+        resolve();
+      });
+
+      req.on('error', (error) => {
+        if (settled) return;
+        settled = true;
+        console.error(`[dev-server] Client request failed for ${targetPath}:`, error.message);
+
+        if (!res.headersSent) {
+          writeJson(res, 502, {
+            error: `Client request failed before reaching backend`,
+            details: error.message,
+          });
+        } else {
+          res.destroy(error);
+        }
+
+        resolve();
+      });
+
+      req.on('aborted', () => {
+        upstreamReq.destroy(new Error('Client request aborted'));
+        finish();
+      });
+
+      if (attempt === 1) {
+        req.pipe(upstreamReq);
+      } else {
+        upstreamReq.end();
       }
-    );
+    };
 
-    upstreamReq.setTimeout(PROXY_TIMEOUT_MS, () => {
-      upstreamReq.destroy(new Error(`Proxy request timed out after ${PROXY_TIMEOUT_MS}ms`));
-    });
-
-    upstreamReq.on('error', failProxy);
-    req.on('error', failProxy);
-    req.on('aborted', () => {
-      upstreamReq.destroy(new Error('Client request aborted'));
-      finish();
-    });
-
-    req.pipe(upstreamReq);
+    makeAttempt();
   });
 }
 
