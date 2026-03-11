@@ -1,9 +1,9 @@
-/**
- * run.js — Main crawl loop orchestrator
+﻿/**
+ * run.js ΓÇö Main crawl loop orchestrator
  * Ties together all crawler modules into a single `runCrawl()` function
  * that replaces the inline crawl logic from index.js.
  *
- * Exports: runCrawl(config) → Promise<CrawlResult>
+ * Exports: runCrawl(config) ΓåÆ Promise<CrawlResult>
  */
 
 const fs = require('fs');
@@ -16,7 +16,9 @@ const graph = require('./graph');
 const systemHandlers = require('./system-handlers');
 const adb = require('./adb');
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 /**
  * Execute an action on the device.
@@ -96,12 +98,14 @@ async function runCrawl(config) {
   let formFilledOnce = false;
   let consecutiveDeviceFails = 0;
   const MAX_DEVICE_FAILS = 3;
+  let consecutiveCaptureFails = 0;
+  const MAX_CAPTURE_FAILS = 3;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
     console.log(`\n[crawler] === Step ${step + 1}/${maxSteps} ===`);
 
-    // 0. Device health check — abort early if emulator disappeared
+    // 0. Device health check ΓÇö abort early if emulator disappeared
     if (!adb.isDeviceOnline()) {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device offline (attempt ${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
@@ -116,17 +120,43 @@ async function runCrawl(config) {
 
     // 1. Capture current screen
     const snapshot = screen.capture(screenshotDir, step);
-    if (!snapshot) {
-      console.log('  [crawler] Screenshot capture failed, retrying...');
+
+    if (!snapshot || snapshot.error === 'capture_failed') {
+      consecutiveCaptureFails++;
+      console.log(`  [crawler] Screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`);
+
+      if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
+        stopReason = 'capture_failed';
+        break;
+      }
+
       await sleep(2000);
       continue;
     }
+
+    if (snapshot.error === 'device_offline') {
+      consecutiveDeviceFails++;
+      console.log(`  [crawler] Device lost during capture (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+
+      if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+        stopReason = 'device_offline';
+        break;
+      }
+
+      await sleep(3000);
+      continue;
+    }
+
+    consecutiveCaptureFails = 0;
+    consecutiveDeviceFails = 0;
     screens.push(snapshot);
 
     // 2. Compute fingerprint
     const fp = fingerprint.compute(snapshot.xml);
     const isNew = !stateGraph.isVisited(fp);
-    console.log(`  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`);
+    console.log(
+      `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
+    );
 
     // 3. Track new-state detection for stop condition
     if (isNew) {
@@ -134,7 +164,7 @@ async function runCrawl(config) {
     } else {
       consecutiveNoNewState++;
       if (consecutiveNoNewState >= MAX_NO_NEW_STATE) {
-        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state — stopping`);
+        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state ΓÇö stopping`);
         stopReason = 'no_new_states';
         stateGraph.addState(fp, snapshot);
         break;
@@ -155,7 +185,7 @@ async function runCrawl(config) {
         fromFingerprint: fp,
       });
       await sleep(1500);
-      continue; // re-capture after handling
+      continue;
     }
 
     // 6. Detect and fill forms (only if credentials provided and not already filled)
@@ -164,6 +194,7 @@ async function runCrawl(config) {
       if (formResult.isForm) {
         console.log(`  [crawler] Login/signup form detected with ${formResult.fields.length} fields`);
         const fillActions = await forms.fillForm(formResult.fields, credentials, sleep);
+
         if (fillActions.length > 0) {
           formFilledOnce = true;
           actionsTaken.push({
@@ -172,27 +203,40 @@ async function runCrawl(config) {
             fields: fillActions,
             fromFingerprint: fp,
           });
+
           await sleep(1000);
 
-          // After filling, look for a submit button and tap it
           const submitXml = adb.dumpXml();
           const submitCandidates = actions.extract(submitXml);
-          const submitBtn = submitCandidates.find(a =>
-            a.type === actions.ACTION_TYPES.TAP &&
-            /(login|sign.in|submit|continue|next|log.in)/i.test(`${a.text} ${a.contentDesc} ${a.resourceId}`)
+          const submitBtn = submitCandidates.find(
+            (a) =>
+              a.type === actions.ACTION_TYPES.TAP &&
+              /(login|sign.in|submit|continue|next|log.in)/i.test(`${a.text} ${a.contentDesc} ${a.resourceId}`),
           );
+
           if (submitBtn) {
-            executeAction(submitBtn);
+            const submitDescription = executeAction(submitBtn);
             actionsTaken.push({
               step,
               type: 'form_submit',
               description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
               fromFingerprint: fp,
             });
+            console.log(`  [crawler] ${submitDescription}`);
             console.log(`  [crawler] Tapped submit button after form fill`);
           }
+
+          if (!adb.ensureDeviceReady()) {
+            consecutiveDeviceFails++;
+            console.log(`  [crawler] Device not ready after form submit (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+            if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+              stopReason = 'device_offline';
+              break;
+            }
+          }
+
           await sleep(2000);
-          continue; // re-capture after form interaction
+          continue;
         }
       }
     }
@@ -219,6 +263,17 @@ async function runCrawl(config) {
     const description = executeAction(decision.action);
     console.log(`  [crawler] Executed: ${description} (reason: ${decision.reason})`);
 
+    if (!adb.ensureDeviceReady()) {
+      consecutiveDeviceFails++;
+      console.log(`  [crawler] Device not ready after action (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+      if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+        stopReason = 'device_offline';
+        break;
+      }
+      await sleep(3000);
+      continue;
+    }
+
     // 10. Record transition
     const actionKey = decision.action.key || description;
     actionsTaken.push({
@@ -235,15 +290,30 @@ async function runCrawl(config) {
 
     // Capture post-action fingerprint for the graph edge
     const postSnapshot = screen.capture(screenshotDir, `${step}_post`);
-    if (postSnapshot) {
+    if (postSnapshot && !postSnapshot.error) {
       const postFp = fingerprint.compute(postSnapshot.xml);
       stateGraph.addTransition(fp, actionKey, postFp);
+    } else if (postSnapshot && postSnapshot.error === 'device_offline') {
+      consecutiveDeviceFails++;
+      console.log(`  [crawler] Device lost during post-action capture (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+      if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+        stopReason = 'device_offline';
+        break;
+      }
+    } else if (postSnapshot && postSnapshot.error === 'capture_failed') {
+      consecutiveCaptureFails++;
+      console.log(
+        `  [crawler] Post-action screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`,
+      );
+      if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
+        stopReason = 'capture_failed';
+        break;
+      }
     }
   }
 
-  // Build result
   const result = {
-    screens: screens.map(s => ({
+    screens: screens.map((s) => ({
       index: s.index,
       path: s.screenshotPath,
       activity: s.activity,
@@ -261,9 +331,10 @@ async function runCrawl(config) {
     },
   };
 
-  console.log(`\n[crawler] Crawl complete: ${result.stats.totalSteps} steps, ${result.stats.uniqueStates} unique states, stop reason: ${stopReason}`);
+  console.log(
+    `\n[crawler] Crawl complete: ${result.stats.totalSteps} steps, ${result.stats.uniqueStates} unique states, stop reason: ${stopReason}`,
+  );
 
-  // Save crawl artifacts
   const artifactPath = `${screenshotDir}/crawl_artifacts.json`;
   fs.writeFileSync(artifactPath, JSON.stringify(result, null, 2));
   console.log(`[crawler] Artifacts saved to ${artifactPath}`);

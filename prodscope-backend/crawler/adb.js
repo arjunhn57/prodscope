@@ -1,5 +1,5 @@
-/**
- * adb.js — Thin ADB command wrapper
+﻿/**
+ * adb.js ΓÇö Thin ADB command wrapper
  * Centralizes all adb shell interactions with error handling + timeouts.
  */
 
@@ -32,7 +32,7 @@ function screencap(outPath) {
 function dumpXml() {
   try {
     const raw = run('adb exec-out uiautomator dump /dev/tty 2>/dev/null || echo ""', { ignoreError: true });
-    // uiautomator prefixes with "UI hierchary dumped to: /dev/tty" — strip it
+    // uiautomator prefixes with "UI hierchary dumped to: /dev/tty" ΓÇö strip it
     const xmlStart = raw.indexOf('<?xml');
     return xmlStart >= 0 ? raw.substring(xmlStart) : raw;
   } catch (e) {
