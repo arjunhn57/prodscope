@@ -1,9 +1,9 @@
-﻿/**
- * run.js ΓÇö Main crawl loop orchestrator
+/**
+ * run.js - Main crawl loop orchestrator
  * Ties together all crawler modules into a single `runCrawl()` function
  * that replaces the inline crawl logic from index.js.
  *
- * Exports: runCrawl(config) ΓåÆ Promise<CrawlResult>
+ * Exports: runCrawl(config) -> Promise<CrawlResult>
  */
 
 const fs = require('fs');
@@ -59,7 +59,7 @@ function executeAction(action) {
  * @param {object} config
  * @param {string} config.screenshotDir - Directory to save screenshots
  * @param {string} config.packageName - App package name
- * @param {object} [config.credentials] - { username, password }
+ * @param {object} [config.credentials] - { username, email, phone, password, otp }
  * @param {string} [config.goldenPath] - User-provided golden path
  * @param {string} [config.goals] - Analysis goals
  * @param {string} [config.painPoints] - Known pain points
@@ -95,17 +95,19 @@ async function runCrawl(config) {
   let stopReason = 'max_steps_reached';
   let consecutiveNoNewState = 0;
   const MAX_NO_NEW_STATE = 5;
-  let formFilledOnce = false;
   let consecutiveDeviceFails = 0;
   const MAX_DEVICE_FAILS = 3;
   let consecutiveCaptureFails = 0;
   const MAX_CAPTURE_FAILS = 3;
 
+  const handledFormScreens = new Set();
+  let authFillCount = 0;
+  const MAX_AUTH_FILLS = 4;
+
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
     console.log(`\n[crawler] === Step ${step + 1}/${maxSteps} ===`);
 
-    // 0. Device health check ΓÇö abort early if emulator disappeared
     if (!adb.isDeviceOnline()) {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device offline (attempt ${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
@@ -118,7 +120,6 @@ async function runCrawl(config) {
     }
     consecutiveDeviceFails = 0;
 
-    // 1. Capture current screen
     const snapshot = screen.capture(screenshotDir, step);
 
     if (!snapshot || snapshot.error === 'capture_failed') {
@@ -151,30 +152,26 @@ async function runCrawl(config) {
     consecutiveDeviceFails = 0;
     screens.push(snapshot);
 
-    // 2. Compute fingerprint
     const fp = fingerprint.compute(snapshot.xml);
     const isNew = !stateGraph.isVisited(fp);
     console.log(
       `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
     );
 
-    // 3. Track new-state detection for stop condition
     if (isNew) {
       consecutiveNoNewState = 0;
     } else {
       consecutiveNoNewState++;
       if (consecutiveNoNewState >= MAX_NO_NEW_STATE) {
-        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state ΓÇö stopping`);
+        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state - stopping`);
         stopReason = 'no_new_states';
         stateGraph.addState(fp, snapshot);
         break;
       }
     }
 
-    // 4. Add state to graph
     stateGraph.addState(fp, snapshot);
 
-    // 5. Handle system dialogs first
     const sysResult = systemHandlers.check(snapshot.xml);
     if (sysResult.handled) {
       actionsTaken.push({
@@ -188,65 +185,72 @@ async function runCrawl(config) {
       continue;
     }
 
-    // 6. Detect and fill forms (only if credentials provided and not already filled)
-    if (credentials && !formFilledOnce) {
+    if (credentials && authFillCount < MAX_AUTH_FILLS) {
       const formResult = forms.detectForm(snapshot.xml);
+
       if (formResult.isForm) {
-        console.log(`  [crawler] Login/signup form detected with ${formResult.fields.length} fields`);
-        const fillActions = await forms.fillForm(formResult.fields, credentials, sleep);
+        const formKey = `${fp}::${formResult.fields.map((f) => f.type).sort().join('|')}`;
 
-        if (fillActions.length > 0) {
-          formFilledOnce = true;
-          actionsTaken.push({
-            step,
-            type: 'form_fill',
-            fields: fillActions,
-            fromFingerprint: fp,
-          });
+        if (!handledFormScreens.has(formKey)) {
+          console.log(`  [crawler] Login/signup form detected with ${formResult.fields.length} fields`);
 
-          await sleep(1000);
+          const fillActions = await forms.fillForm(formResult.fields, credentials, sleep);
 
-          const submitXml = adb.dumpXml();
-          const submitCandidates = actions.extract(submitXml);
-          const submitBtn = submitCandidates.find(
-            (a) =>
-              a.type === actions.ACTION_TYPES.TAP &&
-              /(login|sign.in|submit|continue|next|log.in)/i.test(`${a.text} ${a.contentDesc} ${a.resourceId}`),
-          );
+          if (fillActions.length > 0) {
+            handledFormScreens.add(formKey);
+            authFillCount++;
 
-          if (submitBtn) {
-            const submitDescription = executeAction(submitBtn);
             actionsTaken.push({
               step,
-              type: 'form_submit',
-              description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
+              type: 'form_fill',
+              fields: fillActions,
               fromFingerprint: fp,
             });
-            console.log(`  [crawler] ${submitDescription}`);
-            console.log(`  [crawler] Tapped submit button after form fill`);
-          }
 
-          if (!adb.ensureDeviceReady()) {
-            consecutiveDeviceFails++;
-            console.log(`  [crawler] Device not ready after form submit (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
-            if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
-              stopReason = 'device_offline';
-              break;
+            await sleep(1000);
+
+            const submitXml = adb.dumpXml();
+            const submitCandidates = actions.extract(submitXml);
+            const submitBtn = submitCandidates.find(
+              (a) =>
+                a.type === actions.ACTION_TYPES.TAP &&
+                /(login|sign.in|submit|continue|next|log.in|verify|confirm)/i.test(
+                  `${a.text} ${a.contentDesc} ${a.resourceId}`,
+                ),
+            );
+
+            if (submitBtn) {
+              const submitDescription = executeAction(submitBtn);
+              actionsTaken.push({
+                step,
+                type: 'form_submit',
+                description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
+                fromFingerprint: fp,
+              });
+              console.log(`  [crawler] ${submitDescription}`);
+              console.log(`  [crawler] Tapped submit button after form fill`);
             }
-          }
 
-          await sleep(2000);
-          continue;
+            if (!adb.ensureDeviceReady()) {
+              consecutiveDeviceFails++;
+              console.log(`  [crawler] Device not ready after form submit (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+              if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+                stopReason = 'device_offline';
+                break;
+              }
+            }
+
+            await sleep(2000);
+            continue;
+          }
         }
       }
     }
 
-    // 7. Extract candidate actions (filtering already-tried ones)
     const tried = stateGraph.triedActionsFor(fp);
     const candidates = actions.extract(snapshot.xml, tried);
     console.log(`  [crawler] ${candidates.length} candidate actions (${tried.size} already tried)`);
 
-    // 8. Let policy choose the best action
     const decision = policy.choose(candidates, stateGraph, fp, {
       goldenPath,
       goals,
@@ -259,7 +263,6 @@ async function runCrawl(config) {
       break;
     }
 
-    // 9. Execute the chosen action
     const description = executeAction(decision.action);
     console.log(`  [crawler] Executed: ${description} (reason: ${decision.reason})`);
 
@@ -274,7 +277,6 @@ async function runCrawl(config) {
       continue;
     }
 
-    // 10. Record transition
     const actionKey = decision.action.key || description;
     actionsTaken.push({
       step,
@@ -285,10 +287,8 @@ async function runCrawl(config) {
       fromFingerprint: fp,
     });
 
-    // Wait for the screen to settle
     await sleep(2000);
 
-    // Capture post-action fingerprint for the graph edge
     const postSnapshot = screen.capture(screenshotDir, `${step}_post`);
     if (postSnapshot && !postSnapshot.error) {
       const postFp = fingerprint.compute(postSnapshot.xml);
