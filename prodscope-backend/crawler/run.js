@@ -100,6 +100,15 @@ function findBestAuthSubmitAction(candidates) {
   return submitCandidates[0];
 }
 
+function makeAuthSubmitKey(action) {
+  return `${action.text || ''}|${action.resourceId || ''}|${action.contentDesc || ''}|${action.bounds ? `${action.bounds.cx},${action.bounds.cy}` : ''}`;
+}
+
+function hasValidationErrorText(xml) {
+  if (!xml) return false;
+  return /(invalid|required|already exists|already registered|password must|enter a valid|try again|error|incorrect|failed|unable|not available)/i.test(xml);
+}
+
 async function captureStableScreen(screenshotDir, index, maxRetries = 3, retryDelayMs = 2000) {
   let snapshot = null;
 
@@ -170,6 +179,10 @@ async function runCrawl(config) {
   let authFlowActive = false;
   let authFlowStepsRemaining = 0;
   const AUTH_FLOW_MAX_STEPS = 8;
+
+  let lastAuthSubmitKey = null;
+  let consecutiveSameAuthSubmit = 0;
+  const MAX_SAME_AUTH_SUBMIT = 3;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
@@ -259,6 +272,8 @@ async function runCrawl(config) {
         authFlowStepsRemaining--;
         if (authFlowStepsRemaining <= 0) {
           authFlowActive = false;
+          lastAuthSubmitKey = null;
+          consecutiveSameAuthSubmit = 0;
           console.log(`  [crawler] Auth flow expired`);
         }
       }
@@ -310,6 +325,15 @@ async function runCrawl(config) {
             const submitBtn = findBestAuthSubmitAction(submitCandidates);
 
             if (submitBtn) {
+              const submitKey = makeAuthSubmitKey(submitBtn);
+
+              if (submitKey === lastAuthSubmitKey) {
+                consecutiveSameAuthSubmit++;
+              } else {
+                lastAuthSubmitKey = submitKey;
+                consecutiveSameAuthSubmit = 1;
+              }
+
               const submitDescription = executeAction(submitBtn);
               actionsTaken.push({
                 step,
@@ -319,6 +343,22 @@ async function runCrawl(config) {
               });
               console.log(`  [crawler] ${submitDescription}`);
               console.log(`  [crawler] Tapped submit button after form fill`);
+
+              if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
+                const xmlNow = adb.dumpXml() || '';
+                if (hasValidationErrorText(xmlNow)) {
+                  console.log(`  [crawler] Validation error detected after repeated auth submit`);
+                  stopReason = 'auth_validation_error';
+                  break;
+                }
+
+                console.log(`  [crawler] Repeated auth submit loop detected, backing out once`);
+                adb.pressBack();
+                await sleep(1500);
+                lastAuthSubmitKey = null;
+                consecutiveSameAuthSubmit = 0;
+                continue;
+              }
             } else {
               console.log('  [crawler] No auth submit button found after form fill');
             }
@@ -345,12 +385,39 @@ async function runCrawl(config) {
     if (filledFingerprints.has(fp) || authFlowActive || isAuthLikeXml(snapshot.xml)) {
       const authSubmit = findBestAuthSubmitAction(candidates);
       if (authSubmit) {
+        const authKey = makeAuthSubmitKey(authSubmit);
+
+        if (authKey === lastAuthSubmitKey) {
+          consecutiveSameAuthSubmit++;
+        } else {
+          lastAuthSubmitKey = authKey;
+          consecutiveSameAuthSubmit = 1;
+        }
+
+        if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
+          if (hasValidationErrorText(snapshot.xml)) {
+            console.log(`  [crawler] Validation error detected on repeated auth CTA screen`);
+            stopReason = 'auth_validation_error';
+            break;
+          }
+
+          console.log(`  [crawler] Repeated auth CTA loop detected, backing out once`);
+          adb.pressBack();
+          await sleep(1500);
+          lastAuthSubmitKey = null;
+          consecutiveSameAuthSubmit = 0;
+          continue;
+        }
+
         candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE)];
         console.log(`  [crawler] Prioritizing auth CTA in auth flow`);
       } else {
         candidates = candidates.filter((a) => a.type !== actions.ACTION_TYPES.TYPE);
         console.log(`  [crawler] Suppressing extra TYPE actions in auth flow`);
       }
+    } else {
+      lastAuthSubmitKey = null;
+      consecutiveSameAuthSubmit = 0;
     }
 
     console.log(`  [crawler] ${candidates.length} candidate actions (${tried.size} already tried)`);
