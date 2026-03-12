@@ -70,6 +70,31 @@ function isTransientEmptyXml(xml) {
   return false;
 }
 
+function authSubmitScore(action) {
+  const haystack = `${action.text || ''} ${action.contentDesc || ''} ${action.resourceId || ''}`.toLowerCase();
+  const cls = (action.className || '').toLowerCase();
+
+  if (/(sign up|signup|create account|register)/i.test(haystack)) return 120;
+  if (/(sign in|signin|log in|login)/i.test(haystack)) return 115;
+  if (/(continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack)) return 100;
+  if (cls.includes('button') && haystack.trim()) return 80;
+  if (action.type === actions.ACTION_TYPES.TAP && haystack.trim()) return 60;
+  return 0;
+}
+
+function findBestAuthSubmitAction(candidates) {
+  const submitCandidates = candidates.filter((a) => {
+    if (a.type !== actions.ACTION_TYPES.TAP) return false;
+    const haystack = `${a.text || ''} ${a.contentDesc || ''} ${a.resourceId || ''}`.toLowerCase();
+    return /(sign up|signup|create account|register|sign in|signin|log in|login|continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack);
+  });
+
+  if (!submitCandidates.length) return null;
+
+  submitCandidates.sort((a, b) => authSubmitScore(b) - authSubmitScore(a));
+  return submitCandidates[0];
+}
+
 async function captureStableScreen(screenshotDir, index, maxRetries = 3, retryDelayMs = 2000) {
   let snapshot = null;
 
@@ -130,6 +155,7 @@ async function runCrawl(config) {
   const MAX_CAPTURE_FAILS = 3;
 
   const handledFormScreens = new Set();
+  const filledFingerprints = new Set();
   let authFillCount = 0;
   const MAX_AUTH_FILLS = 4;
 
@@ -243,6 +269,7 @@ async function runCrawl(config) {
 
           if (fillActions.length > 0) {
             handledFormScreens.add(formKey);
+            filledFingerprints.add(fp);
             authFillCount++;
 
             actionsTaken.push({
@@ -256,13 +283,7 @@ async function runCrawl(config) {
 
             const submitXml = adb.dumpXml();
             const submitCandidates = actions.extract(submitXml);
-            const submitBtn = submitCandidates.find(
-              (a) =>
-                a.type === actions.ACTION_TYPES.TAP &&
-                /(login|sign.in|submit|continue|next|log.in|verify|confirm)/i.test(
-                  `${a.text} ${a.contentDesc} ${a.resourceId}`,
-                ),
-            );
+            const submitBtn = findBestAuthSubmitAction(submitCandidates);
 
             if (submitBtn) {
               const submitDescription = executeAction(submitBtn);
@@ -274,6 +295,8 @@ async function runCrawl(config) {
               });
               console.log(`  [crawler] ${submitDescription}`);
               console.log(`  [crawler] Tapped submit button after form fill`);
+            } else {
+              console.log('  [crawler] No auth submit button found after form fill');
             }
 
             if (!adb.ensureDeviceReady()) {
@@ -285,7 +308,7 @@ async function runCrawl(config) {
               }
             }
 
-            await sleep(2000);
+            await sleep(2500);
             continue;
           }
         }
@@ -293,7 +316,19 @@ async function runCrawl(config) {
     }
 
     const tried = stateGraph.triedActionsFor(fp);
-    const candidates = actions.extract(snapshot.xml, tried);
+    let candidates = actions.extract(snapshot.xml, tried);
+
+    if (filledFingerprints.has(fp)) {
+      const authSubmit = findBestAuthSubmitAction(candidates);
+      if (authSubmit) {
+        candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE)];
+        console.log(`  [crawler] Prioritizing auth CTA after previous form fill on this screen`);
+      } else {
+        candidates = candidates.filter((a) => a.type !== actions.ACTION_TYPES.TYPE);
+        console.log(`  [crawler] Suppressing extra TYPE actions after previous form fill on this screen`);
+      }
+    }
+
     console.log(`  [crawler] ${candidates.length} candidate actions (${tried.size} already tried)`);
 
     const decision = policy.choose(candidates, stateGraph, fp, {
