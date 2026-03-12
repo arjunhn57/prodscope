@@ -61,6 +61,38 @@ function isAllowedNonTargetPackage(pkg) {
   return false;
 }
 
+function isTransientEmptyXml(xml) {
+  if (!xml) return true;
+  const trimmed = String(xml).trim();
+  if (!trimmed) return true;
+  if (/null root node returned by UiTestAutomationBridge/i.test(trimmed)) return true;
+  if (/^ERROR:/i.test(trimmed)) return true;
+  return false;
+}
+
+async function captureStableScreen(screenshotDir, index, maxRetries = 3, retryDelayMs = 2000) {
+  let snapshot = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    snapshot = screen.capture(screenshotDir, index);
+
+    if (!snapshot || snapshot.error === 'capture_failed' || snapshot.error === 'device_offline') {
+      return snapshot;
+    }
+
+    if (!isTransientEmptyXml(snapshot.xml)) {
+      return snapshot;
+    }
+
+    console.log(`  [crawler] Transient empty/null XML on capture ${index} (attempt ${attempt + 1}/${maxRetries + 1})`);
+    if (attempt < maxRetries) {
+      await sleep(retryDelayMs);
+    }
+  }
+
+  return snapshot;
+}
+
 async function relaunchTargetApp(packageName) {
   console.log(`  [crawler] Relaunching target app: ${packageName}`);
   adb.pressBack();
@@ -68,7 +100,7 @@ async function relaunchTargetApp(packageName) {
   adb.pressBack();
   await sleep(1000);
   adb.run(`adb shell monkey -p ${packageName} -c android.intent.category.LAUNCHER 1`, { ignoreError: true });
-  await sleep(3000);
+  await sleep(5000);
 }
 
 async function runCrawl(config) {
@@ -120,7 +152,7 @@ async function runCrawl(config) {
     }
     consecutiveDeviceFails = 0;
 
-    const snapshot = screen.capture(screenshotDir, step);
+    const snapshot = await captureStableScreen(screenshotDir, step, 3, 2000);
 
     if (!snapshot || snapshot.error === 'capture_failed') {
       consecutiveCaptureFails++;
@@ -302,8 +334,8 @@ async function runCrawl(config) {
 
     await sleep(2000);
 
-    const postSnapshot = screen.capture(screenshotDir, `${step}_post`);
-    if (postSnapshot && !postSnapshot.error) {
+    const postSnapshot = await captureStableScreen(screenshotDir, `${step}_post`, 2, 1500);
+    if (postSnapshot && !postSnapshot.error && !isTransientEmptyXml(postSnapshot.xml)) {
       const postFp = fingerprint.compute(postSnapshot.xml);
       stateGraph.addTransition(fp, actionKey, postFp);
     } else if (postSnapshot && postSnapshot.error === 'device_offline') {
