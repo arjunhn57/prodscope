@@ -1,5 +1,5 @@
 /**
- * system-handlers.js — System dialog and permission prompt handler
+ * system-handlers.js - System dialog and permission prompt handler
  * Detects and auto-dismisses common Android system dialogs so the crawler
  * doesn't get stuck on permission prompts or crash dialogs.
  */
@@ -17,7 +17,6 @@ const HANDLERS = [
     detect: (xml) => /resource-id="com\.android\.permissioncontroller/.test(xml) ||
                      /text="(Allow|While using the app|ALLOW)"/.test(xml),
     resolve: (xml) => {
-      // Find the "Allow" or "While using the app" button
       const patterns = [
         /text="While using the app"[^>]*bounds="([^"]+)"/,
         /text="Allow"[^>]*bounds="([^"]+)"/,
@@ -33,9 +32,39 @@ const HANDLERS = [
           }
         }
       }
-      // Fallback: try generic allow location
       adb.tap(540, 1600);
       return 'Tapped generic allow position';
+    },
+  },
+  {
+    name: 'skip_later_not_now',
+    detect: (xml) =>
+      /text="(Skip|SKIP|Later|LATER|Not now|NOT NOW|Maybe later|Remind me later)"/.test(xml),
+    resolve: (xml) => {
+      const patterns = [
+        /text="Skip"[^>]*bounds="([^"]+)"/,
+        /text="SKIP"[^>]*bounds="([^"]+)"/,
+        /text="Later"[^>]*bounds="([^"]+)"/,
+        /text="LATER"[^>]*bounds="([^"]+)"/,
+        /text="Not now"[^>]*bounds="([^"]+)"/,
+        /text="NOT NOW"[^>]*bounds="([^"]+)"/,
+        /text="Maybe later"[^>]*bounds="([^"]+)"/,
+        /text="Remind me later"[^>]*bounds="([^"]+)"/,
+      ];
+
+      for (const pat of patterns) {
+        const m = xml.match(pat);
+        if (m) {
+          const bounds = parseBounds(m[1]);
+          if (bounds) {
+            adb.tap(bounds.cx, bounds.cy);
+            return `Tapped onboarding dismiss action`;
+          }
+        }
+      }
+
+      adb.pressBack();
+      return 'Dismissed onboarding/interstitial with BACK';
     },
   },
   {
@@ -64,7 +93,6 @@ const HANDLERS = [
     detect: (xml) => /text="(Choose an account|Sign in with Google|Google Sign-in)"/.test(xml) ||
                      /resource-id="com\.google\.android\.gms/.test(xml),
     resolve: (xml) => {
-      // Press back to dismiss Google sign-in prompts
       adb.pressBack();
       return 'Dismissed Google sign-in prompt with BACK';
     },
