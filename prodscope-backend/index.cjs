@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
@@ -25,6 +25,7 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 /** Feature flag: set USE_CRAWLER_V1=false to fall back to legacy inline crawl */
 const USE_CRAWLER_V1 = process.env.USE_CRAWLER_V1 !== "false";
+const SKIP_AI_FOR_TESTS = process.env.SKIP_AI_FOR_TESTS === "true";
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
@@ -70,7 +71,7 @@ app.get("/api/job-status/:jobId", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Job processing ΓÇö orchestrator
+// Job processing - orchestrator
 // ---------------------------------------------------------------------------
 
 async function processJob(jobId, apkPath, opts) {
@@ -193,7 +194,7 @@ async function processJob(jobId, apkPath, opts) {
 
       if (isCrawlFailed) {
         console.error(
-          `Job ${jobId}: crawl failed ΓÇö stopReason=${crawlStopReason}, screens=${screenshots ? screenshots.length : 0}`
+          `Job ${jobId}: crawl failed - stopReason=${crawlStopReason}, screens=${screenshots ? screenshots.length : 0}`
         );
         jobs[jobId].status = "failed";
         jobs[jobId].error = "Crawl failed: " + (crawlStopReason || "no screens captured");
@@ -202,12 +203,41 @@ async function processJob(jobId, apkPath, opts) {
 
       if (isCrawlDegraded) {
         jobs[jobId].crawlQuality = "degraded";
-        console.log(`Job ${jobId}: crawl degraded ΓÇö only ${screenshots.length} screens captured`);
+        console.log(`Job ${jobId}: crawl degraded - only ${screenshots.length} screens captured`);
       } else {
         jobs[jobId].crawlQuality = "good";
       }
     } else {
       screenshots = await legacyCrawl(jobId, screenshotDir);
+    }
+
+    if (SKIP_AI_FOR_TESTS) {
+      console.log(`Job ${jobId}: SKIP_AI_FOR_TESTS=true - skipping analysis, report generation, and email`);
+
+      jobs[jobId].step = 4;
+      jobs[jobId].analyses = [];
+      jobs[jobId].report = JSON.stringify({
+        test_mode: true,
+        summary: "AI analysis skipped for test run",
+        screens_captured: screenshots.length,
+        crawl_quality: jobs[jobId].crawlQuality || "unknown",
+        stop_reason: jobs[jobId].stopReason || "unknown",
+      }, null, 2);
+
+      jobs[jobId].step = 6;
+      jobs[jobId].emailStatus = "skipped_test_mode";
+      jobs[jobId].status =
+        jobs[jobId].crawlQuality === "degraded" ? "degraded" : "complete";
+
+      try {
+        execSync("adb emu kill", { stdio: "ignore" });
+      } catch (e) {}
+
+      try {
+        fs.unlinkSync(apkPath);
+      } catch (e) {}
+
+      return;
     }
 
     // Step 4: Analyze with Claude
@@ -542,4 +572,5 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", function () {
   console.log("ProdScope backend running on port " + PORT);
   console.log("Crawler v1:", USE_CRAWLER_V1 ? "ENABLED" : "DISABLED (legacy)");
+  console.log("SKIP_AI_FOR_TESTS:", SKIP_AI_FOR_TESTS ? "ENABLED" : "DISABLED");
 });
