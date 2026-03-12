@@ -70,6 +70,11 @@ function isTransientEmptyXml(xml) {
   return false;
 }
 
+function isAuthLikeXml(xml) {
+  if (!xml) return false;
+  return /(sign up|signup|create account|register|sign in|signin|log in|login|password|email|phone|otp|verify|confirmation|continue|next|forgot password)/i.test(xml);
+}
+
 function authSubmitScore(action) {
   const haystack = `${action.text || ''} ${action.contentDesc || ''} ${action.resourceId || ''}`.toLowerCase();
   const cls = (action.className || '').toLowerCase();
@@ -157,10 +162,14 @@ async function runCrawl(config) {
   const handledFormScreens = new Set();
   const filledFingerprints = new Set();
   let authFillCount = 0;
-  const MAX_AUTH_FILLS = 4;
+  const MAX_AUTH_FILLS = 5;
 
   let outOfAppRecoveries = 0;
   const MAX_OUT_OF_APP_RECOVERIES = 4;
+
+  let authFlowActive = false;
+  let authFlowStepsRemaining = 0;
+  const AUTH_FLOW_MAX_STEPS = 8;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
@@ -242,6 +251,19 @@ async function runCrawl(config) {
       `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
     );
 
+    if (authFlowActive) {
+      if (isAuthLikeXml(snapshot.xml)) {
+        authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
+        console.log(`  [crawler] Auth flow still active`);
+      } else {
+        authFlowStepsRemaining--;
+        if (authFlowStepsRemaining <= 0) {
+          authFlowActive = false;
+          console.log(`  [crawler] Auth flow expired`);
+        }
+      }
+    }
+
     if (isNew) {
       consecutiveNoNewState = 0;
     } else {
@@ -271,6 +293,8 @@ async function runCrawl(config) {
             handledFormScreens.add(formKey);
             filledFingerprints.add(fp);
             authFillCount++;
+            authFlowActive = true;
+            authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
 
             actionsTaken.push({
               step,
@@ -318,14 +342,14 @@ async function runCrawl(config) {
     const tried = stateGraph.triedActionsFor(fp);
     let candidates = actions.extract(snapshot.xml, tried);
 
-    if (filledFingerprints.has(fp)) {
+    if (filledFingerprints.has(fp) || authFlowActive || isAuthLikeXml(snapshot.xml)) {
       const authSubmit = findBestAuthSubmitAction(candidates);
       if (authSubmit) {
         candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE)];
-        console.log(`  [crawler] Prioritizing auth CTA after previous form fill on this screen`);
+        console.log(`  [crawler] Prioritizing auth CTA in auth flow`);
       } else {
         candidates = candidates.filter((a) => a.type !== actions.ACTION_TYPES.TYPE);
-        console.log(`  [crawler] Suppressing extra TYPE actions after previous form fill on this screen`);
+        console.log(`  [crawler] Suppressing extra TYPE actions in auth flow`);
       }
     }
 
