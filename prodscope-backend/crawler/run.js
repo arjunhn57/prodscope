@@ -1,9 +1,5 @@
 /**
  * run.js - Main crawl loop orchestrator
- * Ties together all crawler modules into a single `runCrawl()` function
- * that replaces the inline crawl logic from index.js.
- *
- * Exports: runCrawl(config) -> Promise<CrawlResult>
  */
 
 const fs = require('fs');
@@ -20,11 +16,6 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Execute an action on the device.
- * @param {object} action - Action object from actions.extract() or policy.choose()
- * @returns {string} Description of what was done
- */
 function executeAction(action) {
   switch (action.type) {
     case actions.ACTION_TYPES.TAP:
@@ -53,27 +44,33 @@ function executeAction(action) {
   }
 }
 
-/**
- * Run the crawl loop.
- *
- * @param {object} config
- * @param {string} config.screenshotDir - Directory to save screenshots
- * @param {string} config.packageName - App package name
- * @param {object} [config.credentials] - { username, email, phone, password, otp }
- * @param {string} [config.goldenPath] - User-provided golden path
- * @param {string} [config.goals] - Analysis goals
- * @param {string} [config.painPoints] - Known pain points
- * @param {number} [config.maxSteps=20] - Maximum crawl steps
- * @param {Function} [config.onProgress] - Called with (stepIndex, totalSteps)
- * @returns {Promise<CrawlResult>}
- *
- * @typedef {object} CrawlResult
- * @property {Array<object>} screens - Captured screen snapshots
- * @property {Array<object>} actionsTaken - Actions executed with outcomes
- * @property {object} graph - Serialized state graph
- * @property {string} stopReason - Why the crawl stopped
- * @property {Array<string>} reproPath - Ordered fingerprints for reproducibility
- */
+function getPrimaryPackage(xml) {
+  if (!xml) return '';
+  const matches = [...xml.matchAll(/package="([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
+  if (!matches.length) return '';
+  const counts = {};
+  for (const pkg of matches) counts[pkg] = (counts[pkg] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function isAllowedNonTargetPackage(pkg) {
+  if (!pkg) return true;
+  if (pkg === 'android') return true;
+  if (pkg === 'com.android.permissioncontroller') return true;
+  if (pkg === 'com.google.android.gms') return true;
+  return false;
+}
+
+async function relaunchTargetApp(packageName) {
+  console.log(`  [crawler] Relaunching target app: ${packageName}`);
+  adb.pressBack();
+  await sleep(1000);
+  adb.pressBack();
+  await sleep(1000);
+  adb.run(`adb shell monkey -p ${packageName} -c android.intent.category.LAUNCHER 1`, { ignoreError: true });
+  await sleep(3000);
+}
+
 async function runCrawl(config) {
   const {
     screenshotDir,
@@ -104,6 +101,9 @@ async function runCrawl(config) {
   let authFillCount = 0;
   const MAX_AUTH_FILLS = 4;
 
+  let outOfAppRecoveries = 0;
+  const MAX_OUT_OF_APP_RECOVERIES = 4;
+
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
     console.log(`\n[crawler] === Step ${step + 1}/${maxSteps} ===`);
@@ -125,12 +125,10 @@ async function runCrawl(config) {
     if (!snapshot || snapshot.error === 'capture_failed') {
       consecutiveCaptureFails++;
       console.log(`  [crawler] Screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`);
-
       if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
         stopReason = 'capture_failed';
         break;
       }
-
       await sleep(2000);
       continue;
     }
@@ -138,12 +136,10 @@ async function runCrawl(config) {
     if (snapshot.error === 'device_offline') {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device lost during capture (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
-
       if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
         stopReason = 'device_offline';
         break;
       }
-
       await sleep(3000);
       continue;
     }
@@ -151,6 +147,36 @@ async function runCrawl(config) {
     consecutiveCaptureFails = 0;
     consecutiveDeviceFails = 0;
     screens.push(snapshot);
+
+    const primaryPackage = getPrimaryPackage(snapshot.xml);
+    console.log(`  [crawler] Primary package: ${primaryPackage || 'unknown'}`);
+
+    const sysResult = systemHandlers.check(snapshot.xml);
+    if (sysResult.handled) {
+      actionsTaken.push({
+        step,
+        type: 'system_handler',
+        handler: sysResult.handler,
+        description: sysResult.action,
+      });
+      await sleep(1500);
+      continue;
+    }
+
+    if (primaryPackage && primaryPackage !== packageName && !isAllowedNonTargetPackage(primaryPackage)) {
+      outOfAppRecoveries++;
+      console.log(`  [crawler] Out-of-app screen detected: ${primaryPackage} (target=${packageName})`);
+
+      if (outOfAppRecoveries > MAX_OUT_OF_APP_RECOVERIES) {
+        stopReason = 'left_target_app';
+        break;
+      }
+
+      await relaunchTargetApp(packageName);
+      continue;
+    }
+
+    outOfAppRecoveries = 0;
 
     const fp = fingerprint.compute(snapshot.xml);
     const isNew = !stateGraph.isVisited(fp);
@@ -171,19 +197,6 @@ async function runCrawl(config) {
     }
 
     stateGraph.addState(fp, snapshot);
-
-    const sysResult = systemHandlers.check(snapshot.xml);
-    if (sysResult.handled) {
-      actionsTaken.push({
-        step,
-        type: 'system_handler',
-        handler: sysResult.handler,
-        description: sysResult.action,
-        fromFingerprint: fp,
-      });
-      await sleep(1500);
-      continue;
-    }
 
     if (credentials && authFillCount < MAX_AUTH_FILLS) {
       const formResult = forms.detectForm(snapshot.xml);
@@ -302,9 +315,7 @@ async function runCrawl(config) {
       }
     } else if (postSnapshot && postSnapshot.error === 'capture_failed') {
       consecutiveCaptureFails++;
-      console.log(
-        `  [crawler] Post-action screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`,
-      );
+      console.log(`  [crawler] Post-action screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`);
       if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
         stopReason = 'capture_failed';
         break;
