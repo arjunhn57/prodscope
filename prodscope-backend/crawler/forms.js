@@ -1,5 +1,5 @@
 /**
- * forms.js — Form detection and credential filling
+ * forms.js - Form detection and credential filling
  * Detects login/signup screens and fills fields using provided credentials.
  */
 
@@ -10,8 +10,43 @@ const { parseBounds } = require('./actions');
  * Heuristic keywords for field type detection.
  */
 const FIELD_PATTERNS = {
-  username: ['username', 'user name', 'user_name', 'email', 'e-mail', 'phone', 'mobile', 'login', 'account', 'userid'],
-  password: ['password', 'passwd', 'pass_word', 'passcode'],
+  email: [
+    'email',
+    'e-mail',
+    'mail',
+  ],
+  phone: [
+    'phone',
+    'mobile',
+    'mobile number',
+    'phone number',
+    'enter phone',
+    'enter mobile',
+    'contact number',
+  ],
+  username: [
+    'username',
+    'user name',
+    'user_name',
+    'login',
+    'account',
+    'userid',
+    'user id',
+  ],
+  password: [
+    'password',
+    'passwd',
+    'pass_word',
+    'passcode',
+    'pin',
+  ],
+  otp: [
+    'otp',
+    'verification code',
+    'code',
+    'enter code',
+    'one time password',
+  ],
 };
 
 /**
@@ -45,16 +80,27 @@ function detectForm(xml) {
     const bounds = parseBounds(boundsStr);
     if (!bounds) continue;
 
-    // Classify field
     let fieldType = 'unknown';
+
     if (FIELD_PATTERNS.password.some(k => combined.includes(k))) {
       fieldType = 'password';
+    } else if (FIELD_PATTERNS.otp.some(k => combined.includes(k))) {
+      fieldType = 'otp';
+    } else if (FIELD_PATTERNS.email.some(k => combined.includes(k))) {
+      fieldType = 'email';
+    } else if (FIELD_PATTERNS.phone.some(k => combined.includes(k))) {
+      fieldType = 'phone';
     } else if (FIELD_PATTERNS.username.some(k => combined.includes(k))) {
       fieldType = 'username';
     }
 
     if (fieldType !== 'unknown') {
-      fields.push({ type: fieldType, bounds, resourceId: get('resource-id'), hint: combined.trim() });
+      fields.push({
+        type: fieldType,
+        bounds,
+        resourceId: get('resource-id'),
+        hint: combined.trim(),
+      });
     }
   }
 
@@ -64,7 +110,7 @@ function detectForm(xml) {
 /**
  * Fill a detected form with credentials.
  * @param {Array} fields - From detectForm()
- * @param {object} credentials - { username, password } from job opts
+ * @param {object} credentials - { username, email, phone, password, otp } from job opts
  * @param {Function} sleepFn - async sleep function
  * @returns {Array<object>} Actions taken
  */
@@ -72,21 +118,34 @@ async function fillForm(fields, credentials, sleepFn) {
   if (!credentials) return [];
 
   const actionsTaken = [];
-  const username = credentials.username || credentials.email || '';
+  const username = credentials.username || '';
+  const email = credentials.email || credentials.username || '';
+  const phone = credentials.phone || credentials.username || '';
   const password = credentials.password || '';
+  const otp = credentials.otp || '';
 
-  // Sort fields by Y position (top to bottom)
   const sorted = [...fields].sort((a, b) => a.bounds.cy - b.bounds.cy);
 
   for (const field of sorted) {
-    const value = field.type === 'password' ? password : username;
+    let value = '';
+
+    if (field.type === 'password') {
+      value = password;
+    } else if (field.type === 'email') {
+      value = email;
+    } else if (field.type === 'phone') {
+      value = phone;
+    } else if (field.type === 'otp') {
+      value = otp;
+    } else if (field.type === 'username') {
+      value = username || email || phone;
+    }
+
     if (!value) continue;
 
-    // Tap the field to focus
     adb.tap(field.bounds.cx, field.bounds.cy);
     await sleepFn(500);
 
-    // Clear existing text and type new value
     adb.run('adb shell input keyevent KEYCODE_MOVE_END', { ignoreError: true });
     adb.run('adb shell input keyevent --longpress $(printf "KEYCODE_DEL %.0s" {1..50})', { ignoreError: true });
     adb.inputText(value);
