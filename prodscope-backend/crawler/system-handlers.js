@@ -37,6 +37,33 @@ const HANDLERS = [
     },
   },
   {
+    name: 'anr_or_not_responding',
+    detect: (xml) =>
+      /alertTitle/.test(xml) &&
+      /(isn&apos;t responding|isn't responding|keeps stopping|has stopped|Close app|Wait)/i.test(xml),
+    resolve: (xml) => {
+      const patterns = [
+        /text="Close app"[^>]*bounds="([^"]+)"/i,
+        /text="OK"[^>]*bounds="([^"]+)"/i,
+        /text="Close"[^>]*bounds="([^"]+)"/i,
+      ];
+
+      for (const pat of patterns) {
+        const m = xml.match(pat);
+        if (m) {
+          const bounds = parseBounds(m[1]);
+          if (bounds) {
+            adb.tap(bounds.cx, bounds.cy);
+            return 'Dismissed ANR/crash dialog';
+          }
+        }
+      }
+
+      adb.pressBack();
+      return 'Dismissed ANR/crash dialog with BACK';
+    },
+  },
+  {
     name: 'skip_later_not_now',
     detect: (xml) =>
       /text="(Skip|SKIP|Later|LATER|Not now|NOT NOW|Maybe later|Remind me later)"/.test(xml),
@@ -58,34 +85,13 @@ const HANDLERS = [
           const bounds = parseBounds(m[1]);
           if (bounds) {
             adb.tap(bounds.cx, bounds.cy);
-            return `Tapped onboarding dismiss action`;
+            return 'Tapped onboarding dismiss action';
           }
         }
       }
 
       adb.pressBack();
       return 'Dismissed onboarding/interstitial with BACK';
-    },
-  },
-  {
-    name: 'app_crashed',
-    detect: (xml) => /text="(has stopped|keeps stopping|isn't responding)"/.test(xml),
-    resolve: (xml) => {
-      const patterns = [
-        /text="(OK|Close app|Close)"[^>]*bounds="([^"]+)"/,
-      ];
-      for (const pat of patterns) {
-        const m = xml.match(pat);
-        if (m) {
-          const bounds = parseBounds(m[2]);
-          if (bounds) {
-            adb.tap(bounds.cx, bounds.cy);
-            return `Dismissed crash dialog: tapped "${m[1]}"`;
-          }
-        }
-      }
-      adb.tap(540, 1400);
-      return 'Dismissed crash dialog (fallback tap)';
     },
   },
   {
