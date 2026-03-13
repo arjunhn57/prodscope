@@ -11,6 +11,7 @@ const forms = require('./forms');
 const graph = require('./graph');
 const systemHandlers = require('./system-handlers');
 const adb = require('./adb');
+const { detectScreenIntent } = require('./screen-intent');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -46,17 +47,10 @@ function executeAction(action) {
 
 function getPrimaryPackage(xml) {
   if (!xml) return '';
-  const matches = [...xml.matchAll(/package="([^"]+)"/g)]
-    .map((m) => m[1])
-    .filter(Boolean);
-
+  const matches = [...xml.matchAll(/package="([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
   if (!matches.length) return '';
-
   const counts = {};
-  for (const pkg of matches) {
-    counts[pkg] = (counts[pkg] || 0) + 1;
-  }
-
+  for (const pkg of matches) counts[pkg] = (counts[pkg] || 0) + 1;
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
@@ -77,18 +71,13 @@ function isTransientEmptyXml(xml) {
   return false;
 }
 
-function isAuthLikeXml(xml) {
-  if (!xml) return false;
-  return /(sign up|signup|create account|register|sign in|signin|log in|login|password|email|phone|otp|verify|confirmation|continue|next|forgot password)/i.test(xml);
-}
-
 function authSubmitScore(action) {
   const haystack = `${action.text || ''} ${action.contentDesc || ''} ${action.resourceId || ''}`.toLowerCase();
   const cls = (action.className || '').toLowerCase();
 
-  if (/(sign up|signup|create account|register)/i.test(haystack)) return 120;
-  if (/(sign in|signin|log in|login)/i.test(haystack)) return 115;
-  if (/(continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack)) return 100;
+  if (/(sign in|signin|log in|login)/i.test(haystack)) return 130;
+  if (/(continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack)) return 110;
+  if (/(sign up|signup|create account|register)/i.test(haystack)) return 90;
   if (cls.includes('button') && haystack.trim()) return 80;
   if (action.type === actions.ACTION_TYPES.TAP && haystack.trim()) return 60;
   return 0;
@@ -250,6 +239,9 @@ async function runCrawl(config) {
     const primaryPackage = getPrimaryPackage(snapshot.xml);
     console.log(`  [crawler] Primary package: ${primaryPackage || 'unknown'}`);
 
+    const screenIntent = detectScreenIntent(snapshot.xml);
+    console.log(`  [intent] type=${screenIntent.type} confidence=${screenIntent.confidence}`);
+
     const sysResult = systemHandlers.check(snapshot.xml);
     if (sysResult.handled) {
       actionsTaken.push({
@@ -285,7 +277,7 @@ async function runCrawl(config) {
     );
 
     if (authFlowActive) {
-      if (isAuthLikeXml(snapshot.xml)) {
+      if (screenIntent.type.startsWith('auth') || screenIntent.type.includes('login') || screenIntent.type.includes('signup') || screenIntent.type === 'email_entry' || screenIntent.type === 'phone_entry' || screenIntent.type === 'otp_verification') {
         authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
         console.log('  [crawler] Auth flow still active');
       } else {
@@ -401,7 +393,15 @@ async function runCrawl(config) {
     const tried = stateGraph.triedActionsFor(fp);
     let candidates = actions.extract(snapshot.xml, tried);
 
-    if (filledFingerprints.has(fp) || authFlowActive || isAuthLikeXml(snapshot.xml)) {
+    if (screenIntent.type === 'auth_choice' || screenIntent.type === 'phone_entry' || screenIntent.type === 'email_entry') {
+      const authSubmit = findBestAuthSubmitAction(candidates);
+      if (authSubmit) {
+        candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key)];
+        console.log(`  [intent] Prioritizing auth CTA for ${screenIntent.type}`);
+      }
+    }
+
+    if (filledFingerprints.has(fp) || authFlowActive || screenIntent.type.startsWith('auth') || screenIntent.type.includes('login') || screenIntent.type.includes('signup') || screenIntent.type === 'email_entry' || screenIntent.type === 'phone_entry' || screenIntent.type === 'otp_verification') {
       const authSubmit = findBestAuthSubmitAction(candidates);
 
       if (authSubmit) {
@@ -533,4 +533,3 @@ async function runCrawl(config) {
 }
 
 module.exports = { runCrawl };
-
