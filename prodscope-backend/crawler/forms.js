@@ -20,6 +20,7 @@ const FIELD_PATTERNS = {
     'enter phone',
     'enter mobile',
     'contact number',
+    'country code',
   ],
   username: [
     'username',
@@ -59,6 +60,18 @@ function classifyField(combined, isPasswordAttr) {
   return 'unknown';
 }
 
+function detectScreenIntent(xml) {
+  const lower = String(xml || '').toLowerCase();
+
+  return {
+    email: /(continue with email|login with email|email address|enter email|email)/i.test(lower),
+    phone: /(phone number|mobile number|enter phone|enter mobile|continue with phone|phone|mobile)/i.test(lower),
+    password: /(password|passcode|pin)/i.test(lower),
+    otp: /(otp|verification code|one time password|verify)/i.test(lower),
+    auth: /(sign in|login|log in|sign up|register|create account|continue|verify|password|email|phone|otp)/i.test(lower),
+  };
+}
+
 /**
  * Detect if the current screen is a login/signup form.
  * @param {string} xml - UI XML dump
@@ -67,6 +80,7 @@ function classifyField(combined, isPasswordAttr) {
 function detectForm(xml) {
   if (!xml) return { isForm: false, fields: [] };
 
+  const screenIntent = detectScreenIntent(xml);
   const rawFields = [];
   const nodeRegex = /<node\s+([^>]+)\/?>/g;
   let m;
@@ -113,54 +127,74 @@ function detectForm(xml) {
 
   if (knownCount === 0) {
     if (sorted.length === 1) {
-      sorted[0].type = 'email';
+      if (screenIntent.phone && !screenIntent.email) {
+        sorted[0].type = 'phone';
+      } else if (screenIntent.email && !screenIntent.phone) {
+        sorted[0].type = 'email';
+      }
     } else if (sorted.length === 2) {
-      sorted[0].type = 'email';
-      sorted[1].type = sorted[1].isPasswordAttr ? 'password' : 'password';
+      if (screenIntent.password) {
+        sorted[0].type = screenIntent.phone && !screenIntent.email ? 'phone' : 'email';
+        sorted[1].type = 'password';
+      } else if (screenIntent.phone && !screenIntent.email) {
+        sorted[0].type = 'phone';
+        sorted[1].type = 'otp';
+      } else if (screenIntent.email && !screenIntent.phone) {
+        sorted[0].type = 'email';
+        sorted[1].type = 'password';
+      }
     } else if (sorted.length >= 3) {
-      sorted[0].type = 'email';
-      sorted[1].type = sorted[1].isPasswordAttr ? 'password' : 'password';
-      sorted[2].type = sorted[2].isPasswordAttr ? 'password' : 'otp';
+      if (screenIntent.phone && !screenIntent.email) {
+        sorted[0].type = 'phone';
+        sorted[1].type = 'otp';
+      } else {
+        sorted[0].type = 'email';
+        sorted[1].type = 'password';
+        sorted[2].type = screenIntent.otp ? 'otp' : 'username';
+      }
     }
   } else {
     const hasPassword = sorted.some((f) => f.type === 'password');
     const hasOtp = sorted.some((f) => f.type === 'otp');
+    const hasPhone = sorted.some((f) => f.type === 'phone');
+    const hasEmail = sorted.some((f) => f.type === 'email');
 
-    if (hasPassword) {
-      for (const field of sorted) {
-        if (field.type === 'unknown') {
+    for (const field of sorted) {
+      if (field.type !== 'unknown') continue;
+
+      if (hasPassword) {
+        if (!hasEmail && screenIntent.email) {
           field.type = 'email';
-          break;
+        } else if (!hasPhone && screenIntent.phone && !screenIntent.email) {
+          field.type = 'phone';
+        } else if (hasOtp || screenIntent.otp) {
+          field.type = 'otp';
+        } else {
+          field.type = 'username';
         }
-      }
-      for (const field of sorted) {
-        if (field.type === 'unknown') {
-          field.type = hasOtp ? 'otp' : 'username';
-        }
-      }
-    } else {
-      for (let i = 0; i < sorted.length; i++) {
-        if (sorted[i].type === 'unknown') {
-          if (i === 0) sorted[i].type = 'email';
-          else if (i === 1) sorted[i].type = 'password';
-          else sorted[i].type = hasOtp ? 'otp' : 'username';
+      } else {
+        if (!hasPhone && screenIntent.phone && !screenIntent.email) {
+          field.type = 'phone';
+        } else if (!hasEmail && screenIntent.email) {
+          field.type = 'email';
+        } else if (screenIntent.password) {
+          field.type = 'password';
         }
       }
     }
   }
 
-  const fields = sorted.filter((f) => f.type !== 'unknown').map((f) => ({
-    type: f.type,
-    bounds: f.bounds,
-    resourceId: f.resourceId,
-    hint: f.hint,
-  }));
-
-  const hasAuthIntent =
-    /sign in|login|log in|sign up|register|create account|continue|verify|password|email|phone|otp/i.test(xml);
+  const fields = sorted
+    .filter((f) => f.type !== 'unknown')
+    .map((f) => ({
+      type: f.type,
+      bounds: f.bounds,
+      resourceId: f.resourceId,
+      hint: f.hint,
+    }));
 
   return {
-    isForm: fields.length > 0 && (hasAuthIntent || fields.length >= 1),
+    isForm: fields.length > 0 && screenIntent.auth,
     fields,
   };
 }
@@ -178,7 +212,7 @@ async function fillForm(fields, credentials, sleepFn) {
   const actionsTaken = [];
   const username = credentials.username || '';
   const email = credentials.email || credentials.username || '';
-  const phone = credentials.phone || credentials.username || '';
+  const phone = credentials.phone || '';
   const password = credentials.password || '';
   const otp = credentials.otp || '';
 
