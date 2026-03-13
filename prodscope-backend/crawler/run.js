@@ -46,10 +46,17 @@ function executeAction(action) {
 
 function getPrimaryPackage(xml) {
   if (!xml) return '';
-  const matches = [...xml.matchAll(/package="([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
+  const matches = [...xml.matchAll(/package="([^"]+)"/g)]
+    .map((m) => m[1])
+    .filter(Boolean);
+
   if (!matches.length) return '';
+
   const counts = {};
-  for (const pkg of matches) counts[pkg] = (counts[pkg] || 0) + 1;
+  for (const pkg of matches) {
+    counts[pkg] = (counts[pkg] || 0) + 1;
+  }
+
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
@@ -101,7 +108,15 @@ function findBestAuthSubmitAction(candidates) {
 }
 
 function makeAuthSubmitKey(action) {
-  return `${action.text || ''}|${action.resourceId || ''}|${action.contentDesc || ''}|${action.bounds ? `${action.bounds.cx},${action.bounds.cy}` : ''}`;
+  return (
+    action.text ||
+    action.resourceId ||
+    action.contentDesc ||
+    'auth_submit_unknown'
+  )
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function hasValidationErrorText(xml) {
@@ -161,15 +176,19 @@ async function runCrawl(config) {
   const screens = [];
   const actionsTaken = [];
   let stopReason = 'max_steps_reached';
+
   let consecutiveNoNewState = 0;
   const MAX_NO_NEW_STATE = 5;
+
   let consecutiveDeviceFails = 0;
   const MAX_DEVICE_FAILS = 3;
+
   let consecutiveCaptureFails = 0;
   const MAX_CAPTURE_FAILS = 3;
 
   const handledFormScreens = new Set();
   const filledFingerprints = new Set();
+
   let authFillCount = 0;
   const MAX_AUTH_FILLS = 5;
 
@@ -260,6 +279,7 @@ async function runCrawl(config) {
 
     const fp = fingerprint.compute(snapshot.xml);
     const isNew = !stateGraph.isVisited(fp);
+
     console.log(
       `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
     );
@@ -267,14 +287,14 @@ async function runCrawl(config) {
     if (authFlowActive) {
       if (isAuthLikeXml(snapshot.xml)) {
         authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
-        console.log(`  [crawler] Auth flow still active`);
+        console.log('  [crawler] Auth flow still active');
       } else {
         authFlowStepsRemaining--;
         if (authFlowStepsRemaining <= 0) {
           authFlowActive = false;
           lastAuthSubmitKey = null;
           consecutiveSameAuthSubmit = 0;
-          console.log(`  [crawler] Auth flow expired`);
+          console.log('  [crawler] Auth flow expired');
         }
       }
     }
@@ -335,29 +355,28 @@ async function runCrawl(config) {
               }
 
               const submitDescription = executeAction(submitBtn);
+
               actionsTaken.push({
                 step,
                 type: 'form_submit',
                 description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
                 fromFingerprint: fp,
               });
+
               console.log(`  [crawler] ${submitDescription}`);
-              console.log(`  [crawler] Tapped submit button after form fill`);
+              console.log('  [crawler] Tapped submit button after form fill');
 
               if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
                 const xmlNow = adb.dumpXml() || '';
                 if (hasValidationErrorText(xmlNow)) {
-                  console.log(`  [crawler] Validation error detected after repeated auth submit`);
+                  console.log('  [crawler] Validation error detected after repeated auth submit');
                   stopReason = 'auth_validation_error';
                   break;
                 }
 
-                console.log(`  [crawler] Repeated auth submit loop detected, backing out once`);
-                adb.pressBack();
-                await sleep(1500);
-                lastAuthSubmitKey = null;
-                consecutiveSameAuthSubmit = 0;
-                continue;
+                console.log('  [crawler] Repeated semantic auth submit loop detected after form fill');
+                stopReason = 'auth_submit_loop';
+                break;
               }
             } else {
               console.log('  [crawler] No auth submit button found after form fill');
@@ -384,6 +403,7 @@ async function runCrawl(config) {
 
     if (filledFingerprints.has(fp) || authFlowActive || isAuthLikeXml(snapshot.xml)) {
       const authSubmit = findBestAuthSubmitAction(candidates);
+
       if (authSubmit) {
         const authKey = makeAuthSubmitKey(authSubmit);
 
@@ -396,24 +416,24 @@ async function runCrawl(config) {
 
         if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
           if (hasValidationErrorText(snapshot.xml)) {
-            console.log(`  [crawler] Validation error detected on repeated auth CTA screen`);
+            console.log('  [crawler] Validation error detected on repeated auth CTA screen');
             stopReason = 'auth_validation_error';
             break;
           }
 
-          console.log(`  [crawler] Repeated auth CTA loop detected, backing out once`);
-          adb.pressBack();
-          await sleep(1500);
-          lastAuthSubmitKey = null;
-          consecutiveSameAuthSubmit = 0;
-          continue;
+          console.log('  [crawler] Repeated semantic auth submit loop detected');
+          stopReason = 'auth_submit_loop';
+          break;
         }
 
-        candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE)];
-        console.log(`  [crawler] Prioritizing auth CTA in auth flow`);
+        candidates = [
+          authSubmit,
+          ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE),
+        ];
+        console.log('  [crawler] Prioritizing auth CTA in auth flow');
       } else {
         candidates = candidates.filter((a) => a.type !== actions.ACTION_TYPES.TYPE);
-        console.log(`  [crawler] Suppressing extra TYPE actions in auth flow`);
+        console.log('  [crawler] Suppressing extra TYPE actions in auth flow');
       }
     } else {
       lastAuthSubmitKey = null;
@@ -461,6 +481,7 @@ async function runCrawl(config) {
     await sleep(2000);
 
     const postSnapshot = await captureStableScreen(screenshotDir, `${step}_post`, 2, 1500);
+
     if (postSnapshot && !postSnapshot.error && !isTransientEmptyXml(postSnapshot.xml)) {
       const postFp = fingerprint.compute(postSnapshot.xml);
       stateGraph.addTransition(fp, actionKey, postFp);
