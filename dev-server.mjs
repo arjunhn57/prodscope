@@ -288,6 +288,16 @@ export function createServer() {
       return;
     }
 
+    if (pathname.startsWith('/api/job-screenshot/') && req.method === 'GET') {
+      await proxyRequest(req, res, pathname);
+      return;
+    }
+
+    if (pathname.startsWith('/api/job-report/') && req.method === 'GET') {
+      await proxyRequest(req, res, pathname);
+      return;
+    }
+
     await serveStatic(req, res, pathname);
   });
 }
