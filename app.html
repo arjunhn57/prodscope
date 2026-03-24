@@ -1008,21 +1008,36 @@ function renderLivePreview(live, jobId) {
 
   const base = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : window.location.origin;
 
-  if (thumbEl) {
-    if (live.screenshotPath && !live.screenshotUnavailable) {
-      const filename = String(live.screenshotPath).split('/').pop();
-      thumbEl.innerHTML = '<img alt="Latest crawl screen">';
-      const img = thumbEl.querySelector('img');
-      img.onerror = function () {
-        thumbEl.textContent = live.captureMode === 'xml_only' ? 'XML-only mode' : 'Preview unavailable';
-      };
-      img.src = base + '/api/job-screenshot/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(filename) + '?t=' + Date.now();
+  if (thumbEl && jobId) {
+    let img = document.getElementById('livePanelStream');
+    if (!img) {
+      thumbEl.innerHTML = '';
+      img = document.createElement('img');
+      img.id = 'livePanelStream';
+      img.alt = 'Live emulator stream';
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.style.display = 'block';
+      thumbEl.appendChild(img);
+    }
+
+    const srcBase = base + '/api/job-live-stream/' + encodeURIComponent(jobId);
+    const currentJob = String(jobId);
+
+    if (img.dataset.jobId !== currentJob) {
+      img.dataset.jobId = currentJob;
+      img.dataset.phase = phase;
+      img.dataset.streamBase = srcBase;
+      img.src = srcBase + '?t=' + Date.now();
     } else {
-      thumbEl.textContent = live.captureMode === 'xml_only' ? 'XML-only mode' : 'Preview unavailable';
+      img.dataset.phase = phase;
+    }
+
+    if ((phase === 'complete' || phase === 'failed') && !img.dataset.terminalPhase) {
+      img.dataset.terminalPhase = phase;
     }
   }
 }
-
 
 /* live bridge */
 window.__liveBridgeInstalled = true;
@@ -1068,5 +1083,442 @@ window.__liveBridgeInstalled = true;
 })();
 
 </script>
+
+<style id="prodscope-live-rail-enhancements">
+  .ps-live-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 720px) minmax(320px, 420px);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .ps-live-main {
+    min-width: 0;
+  }
+
+  .ps-live-rail {
+    min-width: 0;
+    position: sticky;
+    top: 24px;
+  }
+
+  .ps-live-rail .live-panel {
+    display: block !important;
+    margin: 0 !important;
+  }
+
+  .ps-device-card {
+    margin-top: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+    padding: 18px;
+  }
+
+  .ps-device-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+
+  .ps-device-subtitle {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 12px;
+  }
+
+  .ps-device-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    color: #111827;
+  }
+
+  .ps-live-placeholder {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px;
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  @media (max-width: 1180px) {
+    .ps-live-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .ps-live-rail {
+      position: static;
+    }
+  }
+</style>
+
+<script>
+window.__prodscopeLiveRailPatched = true;
+window.__selectedDeviceProfile = window.__selectedDeviceProfile || "pixel_7_android_14";
+window.__deviceProfilesCache = window.__deviceProfilesCache || [
+  { id: "pixel_7_android_14", label: "Pixel 7 · Android 14", androidVersionLabel: "Android 14", formFactor: "phone" },
+  { id: "pixel_5_android_13", label: "Pixel 5 · Android 13", androidVersionLabel: "Android 13", formFactor: "phone" },
+  { id: "pixel_tablet_android_14", label: "Pixel Tablet · Android 14", androidVersionLabel: "Android 14", formFactor: "tablet" },
+  { id: "small_phone_android_12", label: "Small Phone · Android 12", androidVersionLabel: "Android 12", formFactor: "phone" }
+];
+
+async function psLoadDeviceProfiles() {
+  try {
+    const res = await fetch("/api/device-profiles", { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load device profiles");
+    const data = await res.json();
+    if (data && Array.isArray(data.profiles) && data.profiles.length) {
+      window.__deviceProfilesCache = data.profiles;
+    }
+  } catch (e) {
+    console.warn("Using fallback device profiles", e);
+  }
+}
+
+function psRenderDeviceOptions(select) {
+  const profiles = window.__deviceProfilesCache || [];
+  select.innerHTML = "";
+  profiles.forEach(function (profile) {
+    const opt = document.createElement("option");
+    opt.value = profile.id;
+    opt.textContent = profile.label || profile.id;
+    select.appendChild(opt);
+  });
+  select.value = window.__selectedDeviceProfile || "pixel_7_android_14";
+}
+
+function psEnsureDeviceSelector() {
+  const page =
+    document.getElementById("page-new") ||
+    document.querySelector("#page-new") ||
+    document.querySelector('[data-page="new"]');
+
+  if (!page) return;
+  if (document.getElementById("psDeviceCard")) return;
+
+  const card = document.createElement("div");
+  card.id = "psDeviceCard";
+  card.className = "ps-device-card";
+  card.innerHTML =
+    '<div class="ps-device-title">Device</div>' +
+    '<div class="ps-device-subtitle">Choose which emulator profile to test on.</div>' +
+    '<select id="psDeviceSelect" class="ps-device-select"></select>';
+
+  const anchor =
+    page.querySelector(".upload-section") ||
+    page.querySelector(".card") ||
+    page.firstElementChild ||
+    page;
+
+  if (anchor && anchor.parentNode) {
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+  } else {
+    page.appendChild(card);
+  }
+
+  const select = document.getElementById("psDeviceSelect");
+  psRenderDeviceOptions(select);
+
+  select.addEventListener("change", function () {
+    window.__selectedDeviceProfile = select.value || "pixel_7_android_14";
+    try {
+      localStorage.setItem("prodscope.deviceProfile", window.__selectedDeviceProfile);
+    } catch (e) {}
+  });
+
+  try {
+    const saved = localStorage.getItem("prodscope.deviceProfile");
+    if (saved) {
+      window.__selectedDeviceProfile = saved;
+      select.value = saved;
+    }
+  } catch (e) {}
+}
+
+function psEnsureJobLayout() {
+  const page =
+    document.getElementById("page-job") ||
+    document.querySelector("#page-job") ||
+    document.querySelector('[data-page="job"]');
+
+  if (!page) return;
+
+  let layout = document.getElementById("psLiveLayout");
+  if (!layout) {
+    layout = document.createElement("div");
+    layout.id = "psLiveLayout";
+    layout.className = "ps-live-layout";
+
+    const main = document.createElement("div");
+    main.id = "psLiveMain";
+    main.className = "ps-live-main";
+
+    const rail = document.createElement("div");
+    rail.id = "psLiveRail";
+    rail.className = "ps-live-rail";
+    rail.innerHTML = '<div class="ps-live-placeholder">Waiting for live updates…</div>';
+
+    while (page.firstChild) {
+      main.appendChild(page.firstChild);
+    }
+
+    layout.appendChild(main);
+    layout.appendChild(rail);
+    page.appendChild(layout);
+  }
+
+  const rail = document.getElementById("psLiveRail");
+  const panel = document.getElementById("livePanel");
+  if (rail && panel) {
+    if (!rail.contains(panel)) {
+      rail.innerHTML = "";
+      rail.appendChild(panel);
+    }
+    panel.classList.add("show");
+    panel.style.display = "block";
+  }
+}
+
+function psForceLivePanelVisible() {
+  const panel = document.getElementById("livePanel");
+  const rail = document.getElementById("psLiveRail");
+  if (!rail) return;
+
+  if (panel) {
+    if (!rail.contains(panel)) {
+      rail.innerHTML = "";
+      rail.appendChild(panel);
+    }
+    panel.classList.add("show");
+    panel.style.display = "block";
+  }
+}
+
+function psPatchFetchForDeviceProfile() {
+  if (window.__prodscopeFetchPatched) return;
+  if (typeof window.fetch !== "function") return;
+
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = function(input, init) {
+    try {
+      const url =
+        typeof input === "string"
+          ? input
+          : (input && input.url) ? input.url : "";
+
+      if (url && url.indexOf("/api/start-job") !== -1 && init && init.body && typeof init.body.append === "function") {
+        if (!init.body.has("deviceProfile")) {
+          init.body.append("deviceProfile", window.__selectedDeviceProfile || "pixel_7_android_14");
+        }
+      }
+    } catch (e) {
+      console.warn("deviceProfile fetch patch warning", e);
+    }
+
+    return originalFetch(input, init);
+  };
+
+  window.__prodscopeFetchPatched = true;
+}
+
+async function psInitLiveRailEnhancements() {
+  await psLoadDeviceProfiles();
+  psEnsureDeviceSelector();
+  psEnsureJobLayout();
+  psForceLivePanelVisible();
+  psPatchFetchForDeviceProfile();
+}
+
+document.addEventListener("DOMContentLoaded", psInitLiveRailEnhancements);
+setInterval(function () {
+  try {
+    psEnsureDeviceSelector();
+    psEnsureJobLayout();
+    psForceLivePanelVisible();
+    psPatchFetchForDeviceProfile();
+  } catch (e) {}
+}, 1500);
+</script>
+\n
+<style id="ps-live-enhance-style">
+  /* larger live rail */
+  #livePanel{
+    width: 100% !important;
+    max-width: 540px !important;
+  }
+
+  #livePanel .live-panel-body{
+    grid-template-columns: 260px 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
+  }
+
+  #livePanelThumb{
+    width: 260px !important;
+    height: 520px !important;
+    max-width: none !important;
+    max-height: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+  }
+
+  #livePanelThumb img,
+  #livePanelThumb video,
+  #livePanelThumb canvas{
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    display: block !important;
+  }
+
+  /* tap highlight */
+  .ps-live-tap{
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(250, 204, 21, 0.30);
+    border: 2px solid rgba(250, 204, 21, 0.95);
+    box-shadow: 0 0 0 10px rgba(250, 204, 21, 0.18);
+    transform: translate(-50%, -50%) scale(0.72);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .ps-live-tap.show{
+    animation: psLiveTapPulse 850ms ease-out forwards;
+  }
+
+  @keyframes psLiveTapPulse{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(0.72);}
+    15%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.55);}
+  }
+
+  @media (max-width: 1200px){
+    #livePanel .live-panel-body{
+      grid-template-columns: 220px 1fr !important;
+    }
+    #livePanelThumb{
+      width: 220px !important;
+      height: 440px !important;
+    }
+  }
+</style>
+
+<script>
+(function(){
+  if (window.__psLiveEnhancePatch) return;
+  window.__psLiveEnhancePatch = true;
+
+  function getThumb(){
+    return document.getElementById("livePanelThumb");
+  }
+
+  function getPreviewNode(){
+    const thumb = getThumb();
+    if (!thumb) return null;
+    return thumb.querySelector("img,video,canvas");
+  }
+
+  function ensureTapOverlay(){
+    const thumb = getThumb();
+    if (!thumb) return null;
+    let el = thumb.querySelector(".ps-live-tap");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "ps-live-tap";
+      thumb.appendChild(el);
+    }
+    return el;
+  }
+
+  function readTapPoint(){
+    const actionText = (document.getElementById("livePanelAction") || {}).textContent || "";
+    const msgText = (document.getElementById("livePanelMessage") || {}).textContent || "";
+    const combined = actionText + " " + msgText;
+    const m = combined.match(/tap\((\d+)\s*,\s*(\d+)\)/i);
+    if (!m) return null;
+    return { x: Number(m[1]), y: Number(m[2]) };
+  }
+
+  function getIntrinsicSize(node){
+    if (!node) return { w: 1080, h: 2400 };
+
+    if (node.tagName === "IMG") {
+      return {
+        w: node.naturalWidth || 1080,
+        h: node.naturalHeight || 2400
+      };
+    }
+
+    if (node.tagName === "VIDEO") {
+      return {
+        w: node.videoWidth || 1080,
+        h: node.videoHeight || 2400
+      };
+    }
+
+    if (node.tagName === "CANVAS") {
+      return {
+        w: node.width || 1080,
+        h: node.height || 2400
+      };
+    }
+
+    return { w: 1080, h: 2400 };
+  }
+
+  function placeTapOverlay(){
+    const thumb = getThumb();
+    const preview = getPreviewNode();
+    const tap = readTapPoint();
+    const overlay = ensureTapOverlay();
+
+    if (!thumb || !preview || !tap || !overlay) return;
+
+    const thumbRect = thumb.getBoundingClientRect();
+    const previewRect = preview.getBoundingClientRect();
+    if (!previewRect.width || !previewRect.height) return;
+
+    const size = getIntrinsicSize(preview);
+    if (!size.w || !size.h) return;
+
+    const left = (previewRect.left - thumbRect.left) + (tap.x / size.w) * previewRect.width;
+    const top  = (previewRect.top  - thumbRect.top)  + (tap.y / size.h) * previewRect.height;
+
+    const key = tap.x + "," + tap.y + "|" + Math.round(left) + "," + Math.round(top);
+    if (overlay.dataset.lastKey === key) return;
+    overlay.dataset.lastKey = key;
+
+    overlay.style.left = left + "px";
+    overlay.style.top = top + "px";
+    overlay.classList.remove("show");
+    void overlay.offsetWidth;
+    overlay.classList.add("show");
+  }
+
+  function keepEnhanced(){
+    const thumb = getThumb();
+    if (thumb) {
+      thumb.style.position = "relative";
+    }
+    placeTapOverlay();
+  }
+
+  document.addEventListener("DOMContentLoaded", keepEnhanced);
+  setInterval(keepEnhanced, 500);
+})();
+</script>
+
 </body>
 </html>

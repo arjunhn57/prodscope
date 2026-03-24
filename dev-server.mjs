@@ -72,6 +72,7 @@ function proxyRequest(req, res, targetPath) {
   const isStartJob = targetPath === '/api/start-job';
   const isStartStatus = targetPath.startsWith('/api/job-status/');
   const isJobStatus = targetPath.startsWith('/api/job-status/');
+  const isLiveStream = targetPath.startsWith('/api/job-live-stream/');
 
   return new Promise((resolve) => {
     let settled = false;
@@ -87,7 +88,7 @@ function proxyRequest(req, res, targetPath) {
     const makeAttempt = () => {
       attempt += 1;
 
-      if (isStartJob || isJobStatus) {
+      if (isStartJob || isJobStatus || isLiveStream) {
         console.log(
           `[dev-server] Proxying ${req.method} ${targetPath} -> ${targetUrl} (attempt ${attempt}/${maxAttempts})`
         );
@@ -103,7 +104,7 @@ function proxyRequest(req, res, targetPath) {
           headers: getForwardHeaders(req.headers),
         },
         (upstreamRes) => {
-          if (isStartJob || isJobStatus) {
+          if (isStartJob || isJobStatus || isLiveStream) {
             console.log(
               `[dev-server] Upstream ${targetPath} responded with ${upstreamRes.statusCode || 502}`
             );
@@ -155,7 +156,7 @@ function proxyRequest(req, res, targetPath) {
         }
       );
 
-      const timeoutMs = isJobStatus ? Math.max(PROXY_TIMEOUT_MS, 120000) : PROXY_TIMEOUT_MS;
+      const timeoutMs = (isJobStatus || isLiveStream) ? Math.max(PROXY_TIMEOUT_MS, 120000) : PROXY_TIMEOUT_MS;
 
       upstreamReq.setTimeout(timeoutMs, () => {
         upstreamReq.destroy(new Error(`Proxy request timed out after ${timeoutMs}ms`));
@@ -284,6 +285,16 @@ export function createServer() {
     }
 
     if (pathname.startsWith('/api/job-status/') && req.method === 'GET') {
+      await proxyRequest(req, res, pathname);
+      return;
+    }
+
+    if (pathname === '/api/device-profiles' && req.method === 'GET') {
+      await proxyRequest(req, res, pathname);
+      return;
+    }
+
+    if (pathname.startsWith('/api/job-live-stream/') && req.method === 'GET') {
       await proxyRequest(req, res, pathname);
       return;
     }
