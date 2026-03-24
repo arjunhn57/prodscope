@@ -156,11 +156,15 @@ function proxyRequest(req, res, targetPath) {
         }
       );
 
-      const timeoutMs = (isJobStatus || isLiveStream) ? Math.max(PROXY_TIMEOUT_MS, 120000) : PROXY_TIMEOUT_MS;
+      if (isLiveStream) {
+        upstreamReq.setTimeout(0);
+      } else {
+        const timeoutMs = isJobStatus ? Math.max(PROXY_TIMEOUT_MS, 120000) : PROXY_TIMEOUT_MS;
 
-      upstreamReq.setTimeout(timeoutMs, () => {
-        upstreamReq.destroy(new Error(`Proxy request timed out after ${timeoutMs}ms`));
-      });
+        upstreamReq.setTimeout(timeoutMs, () => {
+          upstreamReq.destroy(new Error(`Proxy request timed out after ${timeoutMs}ms`));
+        });
+      }
 
       upstreamReq.on('error', (error) => {
         const retryable =

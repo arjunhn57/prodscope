@@ -1021,6 +1021,32 @@ function renderLivePreview(live, jobId) {
       thumbEl.appendChild(img);
     }
 
+    if (!img.dataset.boundRetry) {
+      img.dataset.boundRetry = '1';
+
+      img.onerror = function () {
+        const phaseNow = img.dataset.phase || '';
+        if (phaseNow === 'complete' || phaseNow === 'failed') return;
+
+        const retryCount = Number(img.dataset.retryCount || '0') + 1;
+        img.dataset.retryCount = String(retryCount);
+
+        const delay = Math.min(4000, Math.max(1000, retryCount * 1000));
+        clearTimeout(img.__retryTimer);
+
+        img.__retryTimer = setTimeout(function () {
+          const streamBase = img.dataset.streamBase;
+          if (streamBase) {
+            img.src = streamBase + '?retry=' + Date.now();
+          }
+        }, delay);
+      };
+
+      img.onload = function () {
+        img.dataset.retryCount = '0';
+      };
+    }
+
     const srcBase = base + '/api/job-live-stream/' + encodeURIComponent(jobId);
     const currentJob = String(jobId);
 
@@ -1028,6 +1054,9 @@ function renderLivePreview(live, jobId) {
       img.dataset.jobId = currentJob;
       img.dataset.phase = phase;
       img.dataset.streamBase = srcBase;
+      img.dataset.retryCount = '0';
+      delete img.dataset.terminalPhase;
+      clearTimeout(img.__retryTimer);
       img.src = srcBase + '?t=' + Date.now();
     } else {
       img.dataset.phase = phase;
