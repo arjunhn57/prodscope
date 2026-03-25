@@ -103,16 +103,16 @@ function extract(xml, triedActions = new Set()) {
   const nodeRegex = /<node\s+([^>]+)\/?>/g;
   let m;
 
-  const BLOCKED_PACKAGES = new Set([
-    'com.android.systemui',
-    'com.android.settings',
-    'com.google.android.apps.nexuslauncher',
-    'com.google.android.calendar',
-    'com.google.android.gm',
-    'com.google.android.apps.photos',
-    'com.google.android.youtube',
-    'com.android.launcher3',
-  ]);
+  // Block actions from system/framework packages generically by prefix.
+  // This avoids hardcoding specific Google/OEM app package names.
+  const BLOCKED_PACKAGE_PREFIXES = [
+    'com.android.',        // System UI, settings, launcher, etc.
+    'com.google.android.', // Google apps (launcher, calendar, photos, etc.)
+  ];
+  const isBlockedPackage = (pkg) => {
+    if (!pkg) return false;
+    return BLOCKED_PACKAGE_PREFIXES.some((prefix) => pkg.startsWith(prefix));
+  };
 
   while ((m = nodeRegex.exec(xml)) !== null) {
     const attrs = m[1];
@@ -135,7 +135,7 @@ function extract(xml, triedActions = new Set()) {
     if (!bounds) continue;
     if (!enabled) continue;
 
-    if (BLOCKED_PACKAGES.has(pkg)) continue;
+    if (isBlockedPackage(pkg)) continue;
 
     if (bounds.cx < 0 || bounds.cy < 0 || bounds.cx > 1200 || bounds.cy > 2400) continue;
     if ((bounds.x2 - bounds.x1) < 10 || (bounds.y2 - bounds.y1) < 10) continue;

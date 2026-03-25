@@ -18,7 +18,7 @@ const { FlowTracker } = require('../brain/flow-tracker');
 const { FlowDeduplicator } = require('../brain/dedup');
 const { EmulatorWatchdog } = require('../emulator/watchdog');
 const checkpoint = require('./checkpoint');
-const { createInitialPlan, currentTarget, advanceTarget } = require('../brain/planner');
+const { createInitialPlan, replan, currentTarget, advanceTarget } = require('../brain/planner');
 const crashDetector = require('../oracle/crash-detector');
 const anrDetector = require('../oracle/anr-detector');
 const uxHeuristics = require('../oracle/ux-heuristics');
@@ -64,11 +64,19 @@ function getPrimaryPackage(xml) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
+/**
+ * Check if a package is a known system/framework package that may overlay
+ * the target app (e.g., permission dialogs, Google Play Services).
+ * Generic detection by prefix — no app-specific hardcoding.
+ */
 function isAllowedNonTargetPackage(pkg) {
   if (!pkg) return true;
   if (pkg === 'android') return true;
-  if (pkg === 'com.android.permissioncontroller') return true;
-  if (pkg === 'com.google.android.gms') return true;
+  // Android system components
+  if (pkg.startsWith('com.android.')) return true;
+  // Google Play Services / framework overlays
+  if (pkg.startsWith('com.google.android.gms')) return true;
+  if (pkg.startsWith('com.google.android.packageinstaller')) return true;
   return false;
 }
 
@@ -339,6 +347,28 @@ async function runCrawl(config) {
       flowTracker.startFlow(screenType, feature);
     }
 
+    // Replan at navigation hubs every ~15 steps (CLAUDE.md Section 3, Step I)
+    if (isNavHub && step > 0 && step % 15 === 0) {
+      try {
+        const keyLabels = [];
+        const labelMatches = (snapshot.xml || '').match(/text="([^"]+)"/gi);
+        if (labelMatches) {
+          for (const m of labelMatches) {
+            const val = m.match(/text="([^"]+)"/i);
+            if (val && val[1].length > 1 && val[1].length < 40) keyLabels.push(val[1]);
+          }
+        }
+        console.log(`  [planner] Replanning at navigation hub (step ${step})`);
+        plan = await replan(plan, coverageTracker.summary(), {
+          screenType,
+          activity: snapshot.activity,
+          keyLabels: keyLabels.slice(0, 10),
+        });
+      } catch (e) {
+        console.log(`  [planner] Replan failed: ${e.message}`);
+      }
+    }
+
     console.log(
       `  [crawler] Fingerprint: ${fp} fuzzy=${fuzzyFp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) type=${screenType} feature=${feature} activity=${snapshot.activity}`,
     );
@@ -574,7 +604,7 @@ async function runCrawl(config) {
 
     const stepFindings = [];
 
-    // Crash detection
+    // Crash detection (logcat-based, no screen needed)
     const crashResult = crashDetector.checkCrash(packageName);
     if (crashResult.crashed) {
       stepFindings.push({
@@ -588,8 +618,11 @@ async function runCrawl(config) {
       crashDetector.clearLogcat();
     }
 
-    // ANR detection
-    const anrResult = anrDetector.checkANR(packageName);
+    // Capture post-action screen (needed for ANR XML check + UX heuristics)
+    const postSnapshot = await captureStableScreen(screenshotDir, `${step}_post`, 2, 1500);
+
+    // ANR detection (dual: XML dialog check + dumpsys fallback)
+    const anrResult = anrDetector.checkANR(packageName, postSnapshot ? postSnapshot.xml : null);
     if (anrResult.anrDetected) {
       stepFindings.push({
         type: 'anr',
@@ -601,8 +634,6 @@ async function runCrawl(config) {
       console.log(`  [oracle] ANR detected: ${anrResult.source}`);
       anrDetector.dismissANR();
     }
-
-    const postSnapshot = await captureStableScreen(screenshotDir, `${step}_post`, 2, 1500);
 
     if (postSnapshot && !postSnapshot.error && !isTransientEmptyXml(postSnapshot.xml)) {
       const postFp = fingerprint.compute(postSnapshot.xml);
@@ -666,17 +697,20 @@ async function runCrawl(config) {
   }
 
   const result = {
-    screens: screens.map((s, i) => ({
-      index: s.index,
-      path: s.screenshotPath,
-      activity: s.activity,
-      timestamp: s.timestamp,
-      xml: s.xml,
-      step: i,
-      screenType: screenClassifier.classify(s.xml, s.activity, fingerprint.compute(s.xml)).type,
-      feature: screenClassifier.classify(s.xml, s.activity, fingerprint.compute(s.xml)).feature,
-      fuzzyFp: fingerprint.computeFuzzy(s.xml, s.activity),
-    })),
+    screens: screens.map((s, i) => {
+      const cls = screenClassifier.classify(s.xml, s.activity, fingerprint.compute(s.xml));
+      return {
+        index: s.index,
+        path: s.screenshotPath,
+        activity: s.activity,
+        timestamp: s.timestamp,
+        xml: s.xml,
+        step: i,
+        screenType: cls.type,
+        feature: cls.feature,
+        fuzzyFp: fingerprint.computeFuzzy(s.xml, s.activity),
+      };
+    }),
     actionsTaken,
     graph: stateGraph.toJSON(),
     stopReason,

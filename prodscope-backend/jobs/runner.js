@@ -189,7 +189,7 @@ async function processJob(jobId, apkPath, opts) {
 
     // 4a: Triage — select max 8 screens for AI analysis
     const triageResult = triageForAI(
-      screenshots,
+      crawlResult.screens || [],
       crawlResult.oracleFindingsByStep || {},
       crawlResult.coverage || {},
     );

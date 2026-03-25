@@ -130,6 +130,80 @@ function planBoost(action, plan) {
   return 0;
 }
 
+/**
+ * Re-plan exploration strategy at navigation hubs.
+ * Called every ~15 steps when the crawler is at a navigation hub screen.
+ * Uses coverage data to adjust priorities — ~1,500 tokens per call.
+ *
+ * @param {object} currentPlan - The current plan object
+ * @param {object} coverageSummary - From coverageTracker.summary()
+ * @param {object} screen - { screenType, activity, keyLabels }
+ * @returns {Promise<object>} Updated plan
+ */
+async function replan(currentPlan, coverageSummary, screen) {
+  const covLines = Object.entries(coverageSummary || {})
+    .map(([k, v]) => `${k}: ${v.uniqueScreens || 0} screens, ${v.status || "unknown"}`)
+    .join("\n");
+
+  const remaining = (currentPlan.targets || [])
+    .slice(currentPlan.currentTargetIndex || 0)
+    .join(", ");
+
+  const prompt = `You are a QA test planner re-evaluating an Android app exploration strategy mid-crawl.
+
+Current plan targets (remaining): ${remaining || "none"}
+Current screen: ${screen.screenType || "unknown"} (${screen.activity || "unknown"})
+Visible elements: ${(screen.keyLabels || []).slice(0, 10).join(", ") || "none"}
+
+Coverage so far:
+${covLines || "No coverage data yet"}
+
+Based on coverage gaps, re-prioritize the remaining targets. Drop targets that are already "saturated" or "covered". Add any new targets visible from the current screen that weren't in the original plan.
+
+Return JSON only: { "targets": ["target1", "target2", ...], "priority": "breadth_first" | "depth_first", "reason": "short explanation" }
+
+Rules:
+- Max 6 targets
+- Order by importance (uncovered first)
+- Keep reason under 50 words`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: ANALYSIS_MODEL,
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = response.content[0].text;
+    const cleaned = text
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const result = JSON.parse(cleaned);
+
+    if (!Array.isArray(result.targets) || result.targets.length === 0) {
+      console.log("[planner] Replan returned empty targets, keeping current plan");
+      return currentPlan;
+    }
+
+    console.log(`[planner] Replanned: ${result.targets.join(", ")} (${result.reason || "no reason"})`);
+
+    return {
+      ...currentPlan,
+      targets: result.targets.slice(0, 6),
+      priority: result.priority || currentPlan.priority,
+      currentTargetIndex: 0,
+      replanCount: (currentPlan.replanCount || 0) + 1,
+      lastReplanReason: result.reason || "",
+    };
+  } catch (e) {
+    console.error("[planner] Replan LLM call failed:", e.message);
+    return currentPlan; // keep current plan on failure
+  }
+}
+
 const TARGET_SYNONYMS = {
   auth: ["login", "sign in", "sign up", "register", "email", "password"],
   main_feed: ["home", "feed", "timeline", "stream"],
@@ -142,4 +216,4 @@ const TARGET_SYNONYMS = {
   notifications: ["notification", "alert", "bell"],
 };
 
-module.exports = { createInitialPlan, currentTarget, advanceTarget, planBoost, fallbackPlan };
+module.exports = { createInitialPlan, replan, currentTarget, advanceTarget, planBoost, fallbackPlan };

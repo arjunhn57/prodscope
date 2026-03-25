@@ -91,6 +91,48 @@ function hasSignupIndicators(xml) {
 }
 
 // -------------------------------------------------------------------------
+// Content creation sub-type detection (CLAUDE.md Section 4.6)
+// -------------------------------------------------------------------------
+
+/**
+ * Extract the content creation sub-type from a screen's XML.
+ * Only meaningful when screenType is 'media_upload' or feature is 'content_creation'.
+ * @param {string} xml - Raw uiautomator XML
+ * @returns {string} Sub-type: image_post, video_post, story, carousel, text_post, live, generic_post
+ */
+function extractCreationSubType(xml) {
+  if (!xml) return "generic_post";
+
+  const lower = xml.toLowerCase();
+
+  // Extract all text labels for pattern matching
+  const labels = [];
+  const labelMatches = lower.match(/text="([^"]+)"/gi);
+  if (labelMatches) {
+    for (const m of labelMatches) {
+      const val = m.match(/text="([^"]+)"/i);
+      if (val) labels.push(val[1]);
+    }
+  }
+
+  const allText = labels.join(' ');
+
+  if (/\b(reel|reels|short video|shorts)\b/.test(allText)) return "video_post";
+  if (/\b(story|stories|your story|add to story)\b/.test(allText)) return "story";
+  if (/\b(live|go live|live video|broadcast)\b/.test(allText)) return "live";
+  if (/\b(carousel|multiple|select multiple)\b/.test(allText)) return "carousel";
+  if (/\b(video|record|recording|clip)\b/.test(allText)) return "video_post";
+  if (/\b(photo|image|camera|take photo|take picture)\b/.test(allText)) return "image_post";
+  if (/\b(text|status|what's on your mind|write something|compose)\b/.test(allText)) return "text_post";
+
+  // Check for media-related UI elements
+  if (/VideoView|ExoPlayer|MediaPlayer|video_preview/i.test(xml)) return "video_post";
+  if (/CameraView|camera_preview|SurfaceView/i.test(xml)) return "image_post";
+
+  return "generic_post";
+}
+
+// -------------------------------------------------------------------------
 // Screen-to-feature mapping
 // -------------------------------------------------------------------------
 
@@ -135,7 +177,7 @@ function inferFeatureFromActivity(activity) {
  * @param {string} xml - Raw uiautomator XML
  * @param {string} activity - Current activity name
  * @param {string} exactFp - Exact fingerprint (for caching)
- * @returns {{ type: string, confidence: number, feature: string, classifiedBy: string }}
+ * @returns {{ type: string, confidence: number, feature: string, classifiedBy: string, subType: string|null }}
  */
 function classify(xml, activity, exactFp) {
   if (exactFp && cache.has(exactFp)) {
@@ -150,6 +192,13 @@ function classify(xml, activity, exactFp) {
   if (result.feature === "other") {
     const activityFeature = inferFeatureFromActivity(activity);
     if (activityFeature) result.feature = activityFeature;
+  }
+
+  // Content creation sub-type detection
+  if (result.feature === "content_creation" || result.type === "media_upload") {
+    result.subType = extractCreationSubType(xml);
+  } else {
+    result.subType = null;
   }
 
   if (exactFp) {
@@ -231,6 +280,7 @@ module.exports = {
   classify,
   classifyHeuristic,
   featureForScreenType,
+  extractCreationSubType,
   clearCache,
   cacheSize,
   SCREEN_TO_FEATURE,

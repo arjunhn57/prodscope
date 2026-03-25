@@ -1,5 +1,13 @@
 "use strict";
 
+/**
+ * email-renderer.js — Professional HTML email report renderer
+ *
+ * Converts structured JSON report (from report-builder.js) into a polished,
+ * responsive HTML email with: app metadata, score, summary, coverage breakdown,
+ * deterministic findings, AI findings, suggestions, and crawl health stats.
+ */
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -9,73 +17,142 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function renderStringList(items) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return '<p style="margin:8px 0 0;color:#6b7280;">None</p>';
-  }
+// -------------------------------------------------------------------------
+// Reusable rendering helpers
+// -------------------------------------------------------------------------
 
+function renderList(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<p style="margin:8px 0 0;color:#6b7280;font-size:14px;">None found</p>';
+  }
   return (
     '<ul style="margin:8px 0 0 18px;padding:0;color:#111827;">' +
-    items.map((item) => `<li style="margin:6px 0;">${escapeHtml(item)}</li>`).join('') +
-    '</ul>'
+    items.map((item) => `<li style="margin:6px 0;line-height:1.5;">${escapeHtml(item)}</li>`).join("") +
+    "</ul>"
   );
 }
 
-function renderObjectList(items, type) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return '<p style="margin:8px 0 0;color:#6b7280;">None</p>';
+function renderCard(item, colors) {
+  if (typeof item === "string") {
+    return `<div style="border:1px solid ${colors.border};border-radius:10px;padding:12px 16px;margin:8px 0;background:${colors.bg};">
+      <div style="color:#111827;line-height:1.6;font-size:14px;">${escapeHtml(item)}</div>
+    </div>`;
   }
 
-  return items.map((item) => {
-    if (typeof item === "string") {
-      return `
-        <div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin:10px 0;background:#ffffff;">
-          <div style="color:#111827;line-height:1.6;">${escapeHtml(item)}</div>
-        </div>
-      `;
-    }
+  const title = item.title || item.category || item.id || "Finding";
+  const severity = item.severity
+    ? `<span style="display:inline-block;background:${severityColor(item.severity)};color:#fff;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin-left:8px;">${escapeHtml(item.severity).toUpperCase()}</span>`
+    : "";
+  const confidence = item.confidence
+    ? `<span style="font-size:11px;color:#6b7280;margin-left:6px;">(${Math.round(item.confidence * 100)}% confidence)</span>`
+    : "";
+  const desc = item.description
+    ? `<div style="margin-top:6px;color:#374151;line-height:1.5;font-size:14px;">${escapeHtml(item.description)}</div>`
+    : "";
+  const detail = item.detail
+    ? `<div style="margin-top:6px;color:#374151;line-height:1.5;font-size:14px;">${escapeHtml(item.detail)}</div>`
+    : "";
+  const impact = item.impact
+    ? `<div style="margin-top:4px;font-size:12px;color:#6b7280;">Impact: ${escapeHtml(item.impact)}</div>`
+    : "";
+  const items = Array.isArray(item.items) ? renderList(item.items) : "";
+  const recommendations = Array.isArray(item.recommendations) ? renderList(item.recommendations) : "";
+  const fixes = Array.isArray(item.fixes) ? renderList(item.fixes) : "";
+  const issues = Array.isArray(item.issues) ? renderList(item.issues) : "";
 
-    const title =
-      item.title ||
-      item.category ||
-      item.id ||
-      (type === "critical" ? "Critical Issue" : "Item");
-
-    const priority = item.priority ? `<span style="color:#2563eb;"> (${escapeHtml(item.priority)})</span>` : "";
-    const severity = item.severity ? `<div style="margin-top:8px;font-size:12px;color:#6b7280;">Severity: ${escapeHtml(item.severity)}</div>` : "";
-    const description = item.description ? `<div style="margin-top:8px;color:#374151;line-height:1.6;">${escapeHtml(item.description)}</div>` : "";
-    const impact = item.impact ? `<div style="margin-top:8px;font-size:12px;color:#6b7280;">Impact: ${escapeHtml(item.impact)}</div>` : "";
-    const innerItems = Array.isArray(item.items) ? renderStringList(item.items) : "";
-    const recommendations = Array.isArray(item.recommendations) ? renderStringList(item.recommendations) : "";
-    const issues = Array.isArray(item.issues) ? renderStringList(item.issues) : "";
-    const fixes = Array.isArray(item.fixes) ? renderStringList(item.fixes) : "";
-
-    const bg =
-      type === "critical" ? "#fef2f2" :
-      type === "suggestion" ? "#eff6ff" :
-      type === "quickwin" ? "#f0fdf4" :
-      "#ffffff";
-
-    const border =
-      type === "critical" ? "#fecaca" :
-      type === "suggestion" ? "#bfdbfe" :
-      type === "quickwin" ? "#bbf7d0" :
-      "#e5e7eb";
-
-    return `
-      <div style="border:1px solid ${border};border-radius:12px;padding:14px 16px;margin:10px 0;background:${bg};">
-        <div style="font-weight:700;color:#111827;">${escapeHtml(title)}${priority}</div>
-        ${description}
-        ${issues}
-        ${recommendations}
-        ${fixes}
-        ${innerItems}
-        ${impact}
-        ${severity}
-      </div>
-    `;
-  }).join('');
+  return `<div style="border:1px solid ${colors.border};border-radius:10px;padding:12px 16px;margin:8px 0;background:${colors.bg};">
+    <div style="font-weight:700;color:#111827;font-size:14px;">${escapeHtml(title)}${severity}${confidence}</div>
+    ${desc}${detail}${issues}${recommendations}${fixes}${items}${impact}
+  </div>`;
 }
+
+function renderCards(items, colors) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<p style="margin:8px 0 0;color:#6b7280;font-size:14px;">None found</p>';
+  }
+  return items.map((item) => renderCard(item, colors)).join("");
+}
+
+function severityColor(severity) {
+  const s = (severity || "").toLowerCase();
+  if (s === "critical") return "#dc2626";
+  if (s === "high") return "#ea580c";
+  if (s === "medium") return "#d97706";
+  if (s === "low") return "#2563eb";
+  return "#6b7280";
+}
+
+function scoreColor(score) {
+  if (score >= 80) return { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" };
+  if (score >= 60) return { bg: "#fefce8", text: "#a16207", border: "#fde68a" };
+  if (score >= 40) return { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" };
+  return { bg: "#fef2f2", text: "#dc2626", border: "#fecaca" };
+}
+
+// -------------------------------------------------------------------------
+// Coverage summary renderer
+// -------------------------------------------------------------------------
+
+function renderCoverage(coverage) {
+  if (!coverage) return "";
+
+  const summary = coverage.summary || coverage;
+  if (typeof summary !== "object") return "";
+
+  const entries = Object.entries(summary);
+  if (entries.length === 0) return "";
+
+  const rows = entries.map(([feature, data]) => {
+    const status = (data.status || "unknown").toLowerCase();
+    const statusColor = status === "saturated" ? "#15803d" : status === "covered" ? "#2563eb" : status === "exploring" ? "#d97706" : "#6b7280";
+    const screens = data.uniqueScreens || 0;
+    const visits = data.visitCount || 0;
+
+    return `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;">${escapeHtml(feature)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;text-align:center;">${screens}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;text-align:center;">${visits}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;font-size:13px;text-align:center;"><span style="color:${statusColor};font-weight:600;">${escapeHtml(status)}</span></td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <div style="margin:0 0 24px;">
+      <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">Coverage Breakdown</h2>
+      <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+        <thead>
+          <tr style="background:#f9fafb;">
+            <th style="padding:8px 12px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;">Feature</th>
+            <th style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280;font-weight:600;">Screens</th>
+            <th style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280;font-weight:600;">Visits</th>
+            <th style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280;font-weight:600;">Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------------------
+// Deterministic findings renderer
+// -------------------------------------------------------------------------
+
+function renderDeterministicFindings(findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return "";
+
+  return `
+    <div style="margin:0 0 24px;">
+      <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">Automated Findings</h2>
+      <p style="margin:0 0 10px;color:#6b7280;font-size:13px;">Detected automatically during crawl — zero AI tokens used</p>
+      ${renderCards(findings, { bg: "#fef2f2", border: "#fecaca" })}
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------------------
+// Main renderer
+// -------------------------------------------------------------------------
 
 function renderReportEmail(reportText, analysesCount) {
   let report;
@@ -89,60 +166,108 @@ function renderReportEmail(reportText, analysesCount) {
     report = JSON.parse(cleanedReportText);
   } catch (e) {
     return `
-      <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f9fafb;color:#111827;">
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f9fafb;color:#111827;">
         <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:24px;">
-          <h1 style="margin:0 0 8px;font-size:28px;line-height:1.2;">Your ProdScope Analysis Report</h1>
-          <p style="margin:0 0 16px;color:#4b5563;">${analysesCount} screens analyzed</p>
-          <p style="margin:0 0 16px;color:#374151;line-height:1.6;">We could not format the report as structured sections, so the raw report is included below.</p>
-          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:16px;white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.5;color:#111827;">${escapeHtml(cleanedReportText)}</div>
+          <h1 style="margin:0 0 8px;font-size:24px;">ProdScope QA Report</h1>
+          <p style="margin:0 0 16px;color:#6b7280;">Could not format structured report. Raw output below.</p>
+          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:16px;white-space:pre-wrap;font-family:monospace;font-size:13px;line-height:1.5;">${escapeHtml(cleanedReportText)}</div>
         </div>
       </div>
     `;
   }
 
+  // Extract metadata
+  const score = report.overall_score;
+  const sc = scoreColor(typeof score === "number" ? score : 0);
+  const health = report.crawl_health || {};
+  const stats = report.crawl_stats || {};
+  const tokenUsage = report.token_usage || {};
+  const pkgName = report.package_name || report.packageName || "";
+
   return `
-    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f9fafb;color:#111827;">
-      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:24px;">
-        <h1 style="margin:0 0 8px;font-size:28px;line-height:1.2;">Your ProdScope Analysis Report</h1>
-        <p style="margin:0 0 20px;color:#4b5563;">${analysesCount} screens analyzed</p>
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f9fafb;color:#111827;">
+      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;">
 
-        <div style="display:inline-block;background:#eef2ff;color:#4338ca;font-weight:700;border-radius:999px;padding:8px 14px;margin-bottom:18px;">
-          Overall Score: ${escapeHtml(report.overall_score ?? "N/A")}/100
+        <!-- Header -->
+        <div style="margin:0 0 20px;">
+          <h1 style="margin:0 0 4px;font-size:24px;color:#111827;">ProdScope QA Report</h1>
+          ${pkgName ? `<p style="margin:0;color:#6b7280;font-size:14px;">${escapeHtml(pkgName)}</p>` : ""}
         </div>
 
+        <!-- Stats bar -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px;">
+          <div style="background:${sc.bg};border:1px solid ${sc.border};border-radius:10px;padding:12px 18px;text-align:center;min-width:100px;">
+            <div style="font-size:28px;font-weight:800;color:${sc.text};">${typeof score === "number" ? score : "N/A"}</div>
+            <div style="font-size:11px;color:${sc.text};font-weight:600;">SCORE</div>
+          </div>
+          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:12px 18px;text-align:center;min-width:80px;">
+            <div style="font-size:22px;font-weight:700;color:#111827;">${stats.totalSteps || health.totalSteps || "?"}</div>
+            <div style="font-size:11px;color:#6b7280;font-weight:600;">STEPS</div>
+          </div>
+          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:12px 18px;text-align:center;min-width:80px;">
+            <div style="font-size:22px;font-weight:700;color:#111827;">${stats.uniqueStates || health.uniqueStates || "?"}</div>
+            <div style="font-size:11px;color:#6b7280;font-weight:600;">SCREENS</div>
+          </div>
+          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:12px 18px;text-align:center;min-width:80px;">
+            <div style="font-size:22px;font-weight:700;color:#111827;">${analysesCount || health.aiScreensAnalyzed || 0}</div>
+            <div style="font-size:11px;color:#6b7280;font-weight:600;">AI ANALYZED</div>
+          </div>
+        </div>
+
+        <!-- Summary -->
         <div style="margin:0 0 24px;padding:16px;background:#f3f4f6;border-radius:12px;">
-          <h2 style="margin:0 0 8px;font-size:18px;">Summary</h2>
-          <div style="color:#374151;line-height:1.7;">${escapeHtml(report.summary || "No summary available.")}</div>
+          <h2 style="margin:0 0 8px;font-size:18px;color:#111827;">Summary</h2>
+          <div style="color:#374151;line-height:1.7;font-size:14px;">${escapeHtml(report.summary || "No summary available.")}</div>
         </div>
 
+        <!-- Critical Bugs -->
         <div style="margin:0 0 24px;">
-          <h2 style="margin:0 0 10px;font-size:18px;">Critical Bugs</h2>
-          ${renderObjectList(report.critical_bugs || [], "critical")}
+          <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">Critical Bugs</h2>
+          ${renderCards(report.critical_bugs || [], { bg: "#fef2f2", border: "#fecaca" })}
         </div>
 
+        <!-- UX Issues -->
         <div style="margin:0 0 24px;">
-          <h2 style="margin:0 0 10px;font-size:18px;">UX Issues</h2>
-          ${renderObjectList(report.ux_issues || [], "ux")}
+          <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">UX Issues</h2>
+          ${renderCards(report.ux_issues || [], { bg: "#eff6ff", border: "#bfdbfe" })}
         </div>
 
+        <!-- Suggestions -->
         <div style="margin:0 0 24px;">
-          <h2 style="margin:0 0 10px;font-size:18px;">Suggestions</h2>
-          ${renderObjectList(report.suggestions || [], "suggestion")}
+          <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">Suggestions</h2>
+          ${renderCards(report.suggestions || [], { bg: "#eff6ff", border: "#bfdbfe" })}
         </div>
 
+        <!-- Quick Wins -->
         <div style="margin:0 0 24px;">
-          <h2 style="margin:0 0 10px;font-size:18px;">Quick Wins</h2>
-          ${renderObjectList(report.quick_wins || [], "quickwin")}
+          <h2 style="margin:0 0 10px;font-size:18px;color:#111827;">Quick Wins</h2>
+          ${renderCards(report.quick_wins || [], { bg: "#f0fdf4", border: "#bbf7d0" })}
         </div>
 
-        <div style="margin:0 0 24px;">
-          <h2 style="margin:0 0 10px;font-size:18px;">Detailed Findings</h2>
-          ${renderObjectList(report.detailed_findings || [], "finding")}
+        <!-- Deterministic Findings (oracle) -->
+        ${renderDeterministicFindings(report.deterministic_findings)}
+
+        <!-- Coverage Breakdown -->
+        ${renderCoverage(report.coverage)}
+
+        <!-- Crawl Health -->
+        <div style="margin:0 0 20px;padding:14px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">
+          <h2 style="margin:0 0 8px;font-size:16px;color:#111827;">Crawl Health</h2>
+          <div style="font-size:13px;color:#374151;line-height:1.8;">
+            Stop reason: <strong>${escapeHtml(health.stopReason || stats.stopReason || "unknown")}</strong><br>
+            ${health.oracleFindingsCount != null ? `Oracle findings: <strong>${health.oracleFindingsCount}</strong><br>` : ""}
+            ${health.aiScreensAnalyzed != null ? `AI screens analyzed: <strong>${health.aiScreensAnalyzed}</strong> (${health.aiScreensSkipped || 0} skipped by triage)<br>` : ""}
+          </div>
         </div>
 
-        <p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-          Generated by ProdScope automated app testing.
-        </p>
+        <!-- Footer -->
+        <div style="margin:20px 0 0;padding:14px 0 0;border-top:1px solid #e5e7eb;">
+          <div style="font-size:12px;color:#9ca3af;line-height:1.6;">
+            Generated by ProdScope automated app testing<br>
+            ${tokenUsage.input_tokens ? `Tokens used: ${(tokenUsage.input_tokens || 0) + (tokenUsage.output_tokens || 0)} (${tokenUsage.input_tokens} in / ${tokenUsage.output_tokens} out)` : ""}
+          </div>
+        </div>
+
       </div>
     </div>
   `;
