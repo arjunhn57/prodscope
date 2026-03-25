@@ -5,6 +5,7 @@
  */
 
 const { ACTION_TYPES } = require('./actions');
+const { planBoost } = require('../brain/planner');
 
 /**
  * Boost an action's priority if it matches crawl guidance keywords.
@@ -101,7 +102,7 @@ function choose(candidates, graph, currentFingerprint, config = {}) {
 
   const boosted = untried.map(a => ({
     ...a,
-    effectivePriority: a.priority + computeGuidanceBoost(a, guidance),
+    effectivePriority: a.priority + computeGuidanceBoost(a, guidance) + planBoost(a, config.plan),
   }));
 
   // Sort by effective priority

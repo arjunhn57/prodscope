@@ -69,6 +69,28 @@ dialog          → interaction
 error           → error_handling
 ```
 
+## Week 3 — Watchdog + Intelligent Planning ✅
+
+### New Modules
+
+| File | Purpose |
+|------|---------|
+| `emulator/watchdog.js` | EmulatorWatchdog: checks ADB, emulator responsiveness, app foreground, ANR, screen freeze. Returns recovery actions. |
+| `crawler/checkpoint.js` | Saves crawl state to SQLite every 5 steps. Restores on resume, cleans up after completion. |
+| `ingestion/manifest-parser.js` | Extracts package name, launcher activity, activities, permissions from APK via `aapt dump badging`. Replaces `pm list packages -3`. |
+| `brain/planner.js` | 1 LLM call at crawl start → exploration plan with prioritized targets. Falls back to deterministic plan if LLM unavailable. |
+
+### Integration Changes
+
+- **`crawler/adb.js`** — Default timeout reduced from 15s → 5s. `screencap` and `dumpXml` keep 10s (they're legitimately slower).
+- **`crawler/policy.js`** — Now imports `planBoost` from planner. Actions matching the current plan target get +15-20 priority boost.
+- **`crawler/run.js`** — Wired in:
+  - Watchdog health check at every step (before capture). Recovery on failure, abort on 3 consecutive failures.
+  - Checkpoint save every 5 steps to SQLite.
+  - Plan creation at crawl start, target advancement when coverage tracker marks a target as covered.
+  - Plan passed to `policy.choose()` for action ranking boost.
+- **`jobs/runner.js`** — Manifest parsing at ingestion. Uses launcher activity from manifest for `am start` (falls back to `monkey` if unavailable). Passes `appProfile` to `runCrawl`.
+
 ## Deploy to VM
 
 ```bash

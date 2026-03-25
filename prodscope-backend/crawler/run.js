@@ -16,6 +16,9 @@ const screenClassifier = require('../brain/screen-classifier');
 const { CoverageTracker } = require('../brain/coverage-tracker');
 const { FlowTracker } = require('../brain/flow-tracker');
 const { FlowDeduplicator } = require('../brain/dedup');
+const { EmulatorWatchdog } = require('../emulator/watchdog');
+const checkpoint = require('./checkpoint');
+const { createInitialPlan, currentTarget, advanceTarget } = require('../brain/planner');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -199,9 +202,24 @@ async function runCrawl(config) {
   const dedup = new FlowDeduplicator();
   const fuzzyFpsByFeature = {}; // feature → Set of fuzzy fingerprints
 
+  // Watchdog + checkpoint + planner (Week 3)
+  const watchdog = new EmulatorWatchdog(packageName);
+  const sessionId = `crawl-${Date.now()}`;
+
+  // Create initial exploration plan (1 LLM call)
+  let plan = null;
+  const appProfile = config.appProfile || { packageName, activities: [], permissions: [] };
+  try {
+    plan = await createInitialPlan(appProfile, { goals, painPoints, goldenPath }, config.appCategory || 'unknown');
+    console.log(`[planner] Plan: targets=${plan.targets.join(', ')}, priority=${plan.priority}`);
+  } catch (e) {
+    console.log(`[planner] Plan creation failed, proceeding without plan: ${e.message}`);
+  }
+
   let lastAuthSubmitKey = null;
   let consecutiveSameAuthSubmit = 0;
   const MAX_SAME_AUTH_SUBMIT = 3;
+  const CHECKPOINT_INTERVAL = 5;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
@@ -218,6 +236,19 @@ async function runCrawl(config) {
       continue;
     }
     consecutiveDeviceFails = 0;
+
+    // Watchdog health check
+    const health = watchdog.checkHealth();
+    if (!health.healthy) {
+      console.log(`  [watchdog] Unhealthy: ${health.detail} → ${health.action}`);
+      const recovered = await watchdog.recover(health.action);
+      if (!recovered) {
+        stopReason = 'emulator_failure';
+        break;
+      }
+      continue; // Re-enter loop after recovery
+    }
+    watchdog.reportProgress();
 
     const snapshot = await captureStableScreen(screenshotDir, step, 3, 2000);
 
@@ -484,10 +515,17 @@ async function runCrawl(config) {
 
     console.log(`  [crawler] ${candidates.length} candidate actions (${tried.size} already tried)`);
 
+    // Advance plan target if current one is covered
+    if (plan && currentTarget(plan) && coverageTracker.isCovered(currentTarget(plan))) {
+      console.log(`  [planner] Target '${currentTarget(plan)}' covered, advancing`);
+      advanceTarget(plan);
+    }
+
     const decision = policy.choose(candidates, stateGraph, fp, {
       goldenPath,
       goals,
       painPoints,
+      plan,
     });
 
     if (decision.action.type === 'stop') {
@@ -546,6 +584,21 @@ async function runCrawl(config) {
         break;
       }
     }
+
+    // Checkpoint every N steps
+    if ((step + 1) % CHECKPOINT_INTERVAL === 0) {
+      try {
+        checkpoint.save(sessionId, step, {
+          stateGraph: stateGraph.toJSON(),
+          coverage: coverageTracker.serialize(),
+          flows: flowTracker.serialize(),
+          plan,
+        });
+        console.log(`  [checkpoint] Saved at step ${step + 1}`);
+      } catch (e) {
+        console.log(`  [checkpoint] Save failed: ${e.message}`);
+      }
+    }
   }
 
   // Finalize any in-progress flow
@@ -575,8 +628,14 @@ async function runCrawl(config) {
     },
     coverage: coverageTracker.summary(),
     flows: flowTracker.getFlows(),
+    plan,
     classifierCacheSize: screenClassifier.cacheSize(),
   };
+
+  // Cleanup checkpoints on successful completion
+  try {
+    checkpoint.cleanup(sessionId);
+  } catch (e) {}
 
   console.log(
     `\n[crawler] Crawl complete: ${result.stats.totalSteps} steps, ${result.stats.uniqueStates} unique states, stop reason: ${stopReason}`,

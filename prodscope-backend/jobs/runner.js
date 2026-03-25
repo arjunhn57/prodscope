@@ -21,6 +21,7 @@ const {
 } = require("../config/defaults");
 
 const { runCrawl } = require("../crawler/run");
+const { parseApk } = require("../ingestion/manifest-parser");
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -48,21 +49,45 @@ async function processJob(jobId, apkPath, opts) {
     let screenshots = [];
 
     if (USE_CRAWLER_V1) {
-      let packageName = "";
+      // Parse APK manifest for package name + metadata
+      let appProfile = { packageName: "", activities: [], permissions: [], appName: "" };
       try {
-        const packages = execSync("adb shell pm list packages -3")
-          .toString()
-          .trim()
-          .split("\n");
-        packageName = packages[packages.length - 1]
-          .replace("package:", "")
-          .trim();
+        appProfile = parseApk(apkPath);
+        console.log(`Manifest: package=${appProfile.packageName}, launcher=${appProfile.launcherActivity}, activities=${appProfile.activities.length}`);
+      } catch (e) {
+        console.log("Manifest parsing failed, falling back to pm list:", e.message);
+      }
 
-        execSync(
-          "adb shell monkey -p " +
-            packageName +
-            " -c android.intent.category.LAUNCHER 1",
-        );
+      let packageName = appProfile.packageName;
+
+      // Fallback: use pm list packages if manifest parsing didn't get the package name
+      if (!packageName) {
+        try {
+          const packages = execSync("adb shell pm list packages -3")
+            .toString()
+            .trim()
+            .split("\n");
+          packageName = packages[packages.length - 1]
+            .replace("package:", "")
+            .trim();
+        } catch (e) {
+          console.log("Could not detect package name:", e.message);
+        }
+      }
+
+      // Launch app using launcher activity from manifest, or monkey fallback
+      try {
+        if (appProfile.launcherActivity) {
+          execSync(
+            `adb shell am start -n ${packageName}/${appProfile.launcherActivity}`,
+          );
+        } else {
+          execSync(
+            "adb shell monkey -p " +
+              packageName +
+              " -c android.intent.category.LAUNCHER 1",
+          );
+        }
       } catch (e) {
         console.log("Could not launch app:", e.message);
       }
@@ -77,6 +102,7 @@ async function processJob(jobId, apkPath, opts) {
         goals: opts.goals,
         painPoints: opts.painPoints,
         maxSteps: MAX_CRAWL_STEPS,
+        appProfile,
         onProgress: (step, total) => {
           store.updateJob(jobId, { crawlProgress: { step, total } });
         },

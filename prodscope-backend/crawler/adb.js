@@ -6,7 +6,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 
-const DEFAULT_TIMEOUT = 15000;
+const DEFAULT_TIMEOUT = 5000;
 
 function run(cmd, opts = {}) {
   const timeout = opts.timeout || DEFAULT_TIMEOUT;
@@ -21,7 +21,7 @@ function run(cmd, opts = {}) {
 /** Capture a screenshot to outPath. Returns true on success. */
 function screencap(outPath) {
   try {
-    execSync(`adb exec-out screencap -p > "${outPath}"`, { timeout: DEFAULT_TIMEOUT });
+    execSync(`adb exec-out screencap -p > "${outPath}"`, { timeout: 10000 });
     return fs.existsSync(outPath) && fs.statSync(outPath).size > 0;
   } catch (err) {
     return false;
@@ -31,7 +31,7 @@ function screencap(outPath) {
 /** Dump the current UI hierarchy XML. Returns XML string or ''. */
 function dumpXml() {
   try {
-    const raw = run('adb exec-out uiautomator dump /dev/tty 2>/dev/null || echo ""', { ignoreError: true });
+    const raw = run('adb exec-out uiautomator dump /dev/tty 2>/dev/null || echo ""', { ignoreError: true, timeout: 10000 });
     // uiautomator prefixes with "UI hierchary dumped to: /dev/tty" ΓÇö strip it
     const xmlStart = raw.indexOf('<?xml');
     return xmlStart >= 0 ? raw.substring(xmlStart) : raw;
