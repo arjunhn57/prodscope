@@ -79,4 +79,51 @@ function compute(xml) {
   return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 16);
 }
 
-module.exports = { compute, normalize };
+/**
+ * Compute a fuzzy fingerprint that groups structurally similar screens.
+ * Two screens with the same element types/counts but different text/content
+ * will share a fuzzy fingerprint (e.g. two product detail pages).
+ *
+ * @param {string} xml - Raw uiautomator XML
+ * @param {string} activity - Current activity name
+ * @returns {string} Hex SHA-256 hash (first 16 chars)
+ */
+function computeFuzzy(xml, activity) {
+  if (!xml) return 'empty_screen_fuzzy';
+
+  const classNames = new Set();
+  const resourceIds = new Set();
+  let interactableCount = 0;
+  let scrollableCount = 0;
+
+  const nodeRegex = /<node\s+([^>]+)\/?>/g;
+  let m;
+  while ((m = nodeRegex.exec(xml)) !== null) {
+    const attrs = m[1];
+
+    const classMatch = attrs.match(/class="([^"]*)"/);
+    if (classMatch) classNames.add(classMatch[1]);
+
+    const idMatch = attrs.match(/resource-id="([^"]*)"/);
+    if (idMatch && idMatch[1]) resourceIds.add(idMatch[1]);
+
+    if (/clickable="true"/.test(attrs) || /checkable="true"/.test(attrs)) {
+      interactableCount++;
+    }
+    if (/scrollable="true"/.test(attrs)) {
+      scrollableCount++;
+    }
+  }
+
+  const payload = [
+    [...classNames].sort().join(','),
+    [...resourceIds].sort().join(','),
+    String(interactableCount),
+    String(scrollableCount),
+    (activity || '').toLowerCase(),
+  ].join('|');
+
+  return crypto.createHash('sha256').update(payload).digest('hex').substring(0, 16);
+}
+
+module.exports = { compute, computeFuzzy, normalize };

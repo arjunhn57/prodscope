@@ -12,6 +12,10 @@ const graph = require('./graph');
 const systemHandlers = require('./system-handlers');
 const adb = require('./adb');
 const { detectScreenIntent } = require('./screen-intent');
+const screenClassifier = require('../brain/screen-classifier');
+const { CoverageTracker } = require('../brain/coverage-tracker');
+const { FlowTracker } = require('../brain/flow-tracker');
+const { FlowDeduplicator } = require('../brain/dedup');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -154,7 +158,7 @@ async function runCrawl(config) {
     goldenPath,
     goals,
     painPoints,
-    maxSteps = 20,
+    maxSteps = 60,
     onProgress,
   } = config;
 
@@ -187,6 +191,13 @@ async function runCrawl(config) {
   let authFlowActive = false;
   let authFlowStepsRemaining = 0;
   const AUTH_FLOW_MAX_STEPS = 8;
+
+  // Brain modules (Week 2)
+  screenClassifier.clearCache();
+  const coverageTracker = new CoverageTracker();
+  const flowTracker = new FlowTracker();
+  const dedup = new FlowDeduplicator();
+  const fuzzyFpsByFeature = {}; // feature → Set of fuzzy fingerprints
 
   let lastAuthSubmitKey = null;
   let consecutiveSameAuthSubmit = 0;
@@ -270,10 +281,29 @@ async function runCrawl(config) {
     outOfAppRecoveries = 0;
 
     const fp = fingerprint.compute(snapshot.xml);
+    const fuzzyFp = fingerprint.computeFuzzy(snapshot.xml, snapshot.activity);
     const isNew = !stateGraph.isVisited(fp);
 
+    // Classify screen and track coverage
+    const classification = screenClassifier.classify(snapshot.xml, snapshot.activity, fp);
+    const { type: screenType, feature } = classification;
+
+    coverageTracker.recordVisit(feature, fp, screenType);
+    dedup.updateFeatureProfile(feature, snapshot.xml);
+
+    // Track fuzzy fingerprints per feature
+    if (!fuzzyFpsByFeature[feature]) fuzzyFpsByFeature[feature] = new Set();
+    fuzzyFpsByFeature[feature].add(fuzzyFp);
+
+    // Flow tracking
+    const isNavHub = screenType === 'navigation_hub';
+    flowTracker.checkFlowComplete(screenType, isNavHub);
+    if (isNavHub) {
+      flowTracker.startFlow(screenType, feature);
+    }
+
     console.log(
-      `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
+      `  [crawler] Fingerprint: ${fp} fuzzy=${fuzzyFp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) type=${screenType} feature=${feature} activity=${snapshot.activity}`,
     );
 
     if (authFlowActive) {
@@ -304,6 +334,18 @@ async function runCrawl(config) {
     }
 
     stateGraph.addState(fp, snapshot);
+
+    // Coverage-gated skip: if this feature is saturated, back out
+    if (coverageTracker.isSaturated(feature) && !authFlowActive && screenType !== 'navigation_hub') {
+      const dedupCheck = dedup.shouldSkipScreen(feature, fuzzyFp, fuzzyFpsByFeature[feature], snapshot.xml);
+      if (dedupCheck.skip) {
+        console.log(`  [brain] Skipping saturated feature=${feature} (${dedupCheck.reason})`);
+        adb.pressBack();
+        actionsTaken.push({ step, type: 'coverage_skip', description: `back (${feature} saturated)`, reason: dedupCheck.reason });
+        await sleep(1500);
+        continue;
+      }
+    }
 
     if (credentials && authFillCount < MAX_AUTH_FILLS) {
       const formResult = forms.detectForm(snapshot.xml);
@@ -457,6 +499,10 @@ async function runCrawl(config) {
     const description = executeAction(decision.action);
     console.log(`  [crawler] Executed: ${description} (reason: ${decision.reason})`);
 
+    // Record step in flow tracker
+    const actionTarget = decision.action.text || decision.action.resourceId || decision.action.contentDesc || '';
+    flowTracker.addStep(screenType, decision.action.type, actionTarget, fp);
+
     if (!adb.ensureDeviceReady()) {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device not ready after action (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
@@ -502,6 +548,14 @@ async function runCrawl(config) {
     }
   }
 
+  // Finalize any in-progress flow
+  flowTracker.finalizeCurrentFlow('crawl_ended');
+
+  // Register completed flows with dedup
+  for (const flow of flowTracker.getFlows()) {
+    dedup.registerFlow(flow);
+  }
+
   const result = {
     screens: screens.map((s) => ({
       index: s.index,
@@ -519,6 +573,9 @@ async function runCrawl(config) {
       uniqueStates: stateGraph.uniqueStateCount(),
       totalTransitions: stateGraph.transitions.length,
     },
+    coverage: coverageTracker.summary(),
+    flows: flowTracker.getFlows(),
+    classifierCacheSize: screenClassifier.cacheSize(),
   };
 
   console.log(
