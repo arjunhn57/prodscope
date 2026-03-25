@@ -123,16 +123,40 @@ Replaces the per-screenshot LLM loop with deterministic checks + gated AI:
 Old: 20-60 Haiku vision calls + 1 Sonnet report = ~32K+ tokens
 New: max 8 Haiku vision calls + 1 Sonnet report = ~10-12K tokens (~60-70% reduction)
 
+## Week 5 — Generalization + Dedup ✅
+
+### Generalized Modules
+
+| File | Change |
+|------|--------|
+| `crawler/system-handlers.js` | Fully generic: detects ANY dialog/overlay by XML pattern (permission, crash/ANR, third-party auth, onboarding, generic catch-all). No app-specific code. |
+| `crawler/forms.js` | Fully semantic: classifies fields by Android `inputType`, keyword matching, and form intent inference (auth/payment/address/profile/search). No hardcoded field names. |
+| `brain/screen-classifier.js` | Added `extractCreationSubType()` (Section 4.6): detects content sub-types — image_post, video_post, story, carousel, text_post, live. Result stored in `classify().subType`. |
+
+All hardcoded app-specific patches removed.
+
+## Week 6 — Polish + Multi-Job ✅
+
+| File | Change |
+|------|--------|
+| `jobs/queue.js` | In-process FIFO job queue. Decouples HTTP from processing. Single emulator constraint enforced. `recoverPendingJobs()` re-queues stuck jobs on startup. |
+| `server.js` | Refactored to use queue: `POST /api/start-job` returns immediately with `jobId`, `GET /api/queue-status` exposes queue health. |
+| `brain/planner.js` | Added `replan()` — LLM call every ~15 steps at navigation hubs. Re-prioritizes remaining targets based on coverage gaps. |
+| `output/email-renderer.js` | Professional HTML email with score, stats bar, summary, critical bugs, UX issues, suggestions, quick wins, deterministic findings, coverage table, crawl health, footer with token usage. |
+
 ## Deploy to VM
 
 ```bash
 cd ~/prodscope-backend-live
+git fetch origin
+git checkout feat/live-preview-device-presets
+git pull origin feat/live-preview-device-presets
 
 # Install new dependency
 npm install better-sqlite3
 
-# Copy all files (or git pull)
-# New dirs to create: brain/, jobs/, emulator/, output/, utils/, config/, data/, oracle/, ingestion/
+# New dirs created automatically by modules:
+# brain/, jobs/, emulator/, output/, utils/, config/, data/, oracle/, ingestion/
 
 # One-time: create emulator snapshot
 emulator -avd prodscope-test -no-window -no-audio -gpu swiftshader_indirect &
@@ -147,6 +171,7 @@ node server.js
 ## Environment
 
 - GCP VM: `34.10.240.173`, user: `arjunhn`
+- Branch: `feat/live-preview-device-presets`
 - Emulator AVD: `prodscope-test`
 - Android SDK: `~/android-sdk`
 - KVM enabled, 4 vCPUs, 14GB RAM
