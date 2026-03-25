@@ -91,6 +91,38 @@ error           → error_handling
   - Plan passed to `policy.choose()` for action ranking boost.
 - **`jobs/runner.js`** — Manifest parsing at ingestion. Uses launcher activity from manifest for `am start` (falls back to `monkey` if unavailable). Passes `appProfile` to `runCrawl`.
 
+## Week 4 — Token Optimization + Report Quality ✅
+
+### Oracle Pipeline (new `oracle/` directory)
+
+Replaces the per-screenshot LLM loop with deterministic checks + gated AI:
+
+| File | Purpose |
+|------|---------|
+| `oracle/crash-detector.js` | logcat FATAL EXCEPTION detection — zero tokens |
+| `oracle/anr-detector.js` | dumpsys + XML ANR detection — zero tokens |
+| `oracle/ux-heuristics.js` | Accessibility (missing contentDesc, small tap targets), empty screen, slow response — zero tokens |
+| `oracle/triage.js` | Scores screens by findings/diversity/coverage, selects max 8 for AI vision |
+| `oracle/ai-oracle.js` | Gated Haiku vision analysis on triaged screens only |
+
+### Context + Report Modules
+
+| File | Purpose |
+|------|---------|
+| `brain/context-builder.js` | Compressed prompts: ~800 tokens for screen analysis, ~3000 for report synthesis |
+| `output/report-builder.js` | Structured JSON report (Section 8 schema) + 1 Sonnet LLM call. Fallback to deterministic-only report on LLM failure. |
+
+### Key Changes
+
+- **`crawler/run.js`** — Oracle checks (crash/ANR/UX) after every action. `oracleFindings` + `oracleFindingsByStep` in crawl result. Screen objects enriched with `screenType`, `feature`, `fuzzyFp`.
+- **`jobs/runner.js`** — Deleted `analyzeScreenshots()` and `generateReport()`. New pipeline: `triageForAI()` → `analyzeTriagedScreens()` (max 8) → `buildReport()` (1 Sonnet call). Token usage tracked per job.
+- **`config/defaults.js`** — Added `MAX_AI_TRIAGE_SCREENS: 8`, `ACCESSIBILITY_MIN_TAP_DP: 48`, `SLOW_RESPONSE_THRESHOLD_MS: 3000`
+
+### Token Savings
+
+Old: 20-60 Haiku vision calls + 1 Sonnet report = ~32K+ tokens
+New: max 8 Haiku vision calls + 1 Sonnet report = ~10-12K tokens (~60-70% reduction)
+
 ## Deploy to VM
 
 ```bash
@@ -100,7 +132,7 @@ cd ~/prodscope-backend-live
 npm install better-sqlite3
 
 # Copy all files (or git pull)
-# New dirs to create: brain/, jobs/, emulator/, output/, utils/, config/, data/
+# New dirs to create: brain/, jobs/, emulator/, output/, utils/, config/, data/, oracle/, ingestion/
 
 # One-time: create emulator snapshot
 emulator -avd prodscope-test -no-window -no-audio -gpu swiftshader_indirect &
@@ -119,3 +151,4 @@ node server.js
 - Android SDK: `~/android-sdk`
 - KVM enabled, 4 vCPUs, 14GB RAM
 - Entry point: `node server.js` (index.cjs kept as rollback)
+

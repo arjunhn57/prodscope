@@ -5,7 +5,6 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const Anthropic = require("@anthropic-ai/sdk");
 
 const store = require("./store");
 const { bootEmulator, installApk, killEmulator } = require("../emulator/manager");
@@ -16,14 +15,16 @@ const {
   SKIP_AI_FOR_TESTS,
   SCREENSHOT_DIR_PREFIX,
   MAX_CRAWL_STEPS,
-  ANALYSIS_MODEL,
-  REPORT_MODEL,
 } = require("../config/defaults");
 
 const { runCrawl } = require("../crawler/run");
 const { parseApk } = require("../ingestion/manifest-parser");
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Oracle pipeline (Week 4)
+const { triageForAI } = require("../oracle/triage");
+const { analyzeTriagedScreens } = require("../oracle/ai-oracle");
+const { buildReport } = require("../output/report-builder");
+const { renderReportEmail } = require("../output/email-renderer");
 
 // ---------------------------------------------------------------------------
 // Job orchestrator
@@ -166,6 +167,7 @@ async function processJob(jobId, apkPath, opts) {
           screens_captured: screenshots.length,
           crawl_quality: job.crawlQuality || "unknown",
           stop_reason: job.stopReason || "unknown",
+          oracle_findings: crawlResult.oracleFindings || [],
         }, null, 2),
       });
 
@@ -181,22 +183,71 @@ async function processJob(jobId, apkPath, opts) {
       return;
     }
 
-    // Step 4: Analyze with Claude
+    // Step 4: Oracle pipeline — triage → gated AI → structured report
     store.updateJob(jobId, { step: 4 });
-    const analyses = await analyzeScreenshots(screenshots, opts);
+    const tokenUsage = { input_tokens: 0, output_tokens: 0 };
 
-    // Step 5: Generate final report with Sonnet
+    // 4a: Triage — select max 8 screens for AI analysis
+    const triageResult = triageForAI(
+      screenshots,
+      crawlResult.oracleFindingsByStep || {},
+      crawlResult.coverage || {},
+    );
+    console.log(
+      `Job ${jobId}: triage selected ${triageResult.screensToAnalyze.length} screens for AI (skipped ${triageResult.skippedScreens.length})`
+    );
+
+    // 4b: Gated AI analysis — only on triaged screens
+    const { analyses, totalTokens: analysisTokens } = await analyzeTriagedScreens(
+      triageResult.screensToAnalyze,
+      {
+        appCategory: crawlResult.plan?.appCategory || "unknown",
+        coverage: crawlResult.coverage,
+      }
+    );
+    tokenUsage.input_tokens += analysisTokens.input_tokens;
+    tokenUsage.output_tokens += analysisTokens.output_tokens;
+
+    // Step 5: Structured report (1 Sonnet LLM call)
     store.updateJob(jobId, { step: 5 });
     const job = store.getJob(jobId);
-    const report = await generateReport(analyses, opts, job);
-    store.updateJob(jobId, { report });
+
+    const { report, tokenUsage: reportTokens } = await buildReport({
+      packageName: appProfile.packageName || "",
+      coverageSummary: crawlResult.coverage || {},
+      deterministicFindings: crawlResult.oracleFindings || [],
+      aiAnalyses: analyses,
+      flows: crawlResult.flows || [],
+      crawlStats: crawlResult.stats || {},
+      opts,
+      crawlHealth: {
+        stopReason: crawlResult.stopReason,
+        totalSteps: (crawlResult.stats || {}).totalSteps,
+        uniqueStates: (crawlResult.stats || {}).uniqueStates,
+        oracleFindingsCount: (crawlResult.oracleFindings || []).length,
+        aiScreensAnalyzed: triageResult.screensToAnalyze.length,
+        aiScreensSkipped: triageResult.skippedScreens.length,
+      },
+    });
+    tokenUsage.input_tokens += reportTokens.input_tokens;
+    tokenUsage.output_tokens += reportTokens.output_tokens;
+
+    store.updateJob(jobId, {
+      report,
+      tokenUsage,
+      triageLog: triageResult.triageLog,
+    });
+
+    console.log(
+      `Job ${jobId}: tokens used — ${tokenUsage.input_tokens} input + ${tokenUsage.output_tokens} output = ${tokenUsage.input_tokens + tokenUsage.output_tokens} total`
+    );
 
     // Step 6: Send email
     store.updateJob(jobId, { step: 6, emailStatus: "not_requested" });
 
     if (opts.email) {
       store.updateJob(jobId, { emailStatus: "sending" });
-      const emailResult = await sendReportEmail(opts.email, report, analyses.length);
+      const emailResult = await sendReportEmail(opts.email, report, triageResult.screensToAnalyze.length);
       store.updateJob(jobId, { emailStatus: emailResult.status });
       if (emailResult.error) {
         store.updateJob(jobId, { emailError: emailResult.error });
@@ -228,102 +279,6 @@ async function processJob(jobId, apkPath, opts) {
 
 async function legacyCrawl(jobId, screenshotDir) {
   throw new Error("Legacy crawl is disabled in this VM build. Use crawler v1.");
-}
-
-// ---------------------------------------------------------------------------
-// Analysis helpers
-// ---------------------------------------------------------------------------
-
-async function analyzeScreenshots(screenshots, opts) {
-  const analyses = [];
-  for (const ss of screenshots) {
-    try {
-      const imgData = fs.readFileSync(ss.path).toString("base64");
-      const response = await anthropic.messages.create({
-        model: ANALYSIS_MODEL,
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: "image/png",
-                  data: imgData,
-                },
-              },
-              {
-                type: "text",
-                text:
-                  'Analyze this app screenshot for bugs and UX issues. Return JSON: {"bugs":[],"ux_issues":[],"suggestions":[],"severity":"low|medium|high"}. UI XML context: ' +
-                  (ss.xml || "").substring(0, 500),
-              },
-            ],
-          },
-        ],
-      });
-
-      analyses.push({ screen: ss.index, analysis: response.content[0].text });
-    } catch (e) {
-      console.error("Screen analysis failed for screen", ss.index, e.message);
-      analyses.push({
-        screen: ss.index,
-        analysis:
-          '{"bugs":[],"ux_issues":["Analysis failed"],"suggestions":[],"severity":"unknown","error":' +
-          JSON.stringify(e.message) +
-          "}",
-      });
-    }
-  }
-  return analyses;
-}
-
-async function generateReport(analyses, opts, job) {
-  const screenAnalyses = analyses
-    .map(function (a) {
-      return "Screen " + a.screen + ": " + a.analysis;
-    })
-    .join("\n\n");
-
-  let crawlContext = "";
-  if (job.crawlGraph) {
-    crawlContext =
-      "\nCrawl statistics: " +
-      JSON.stringify(job.crawlStats) +
-      "\nStop reason: " +
-      (job.stopReason || "unknown") +
-      "\nUnique screens discovered: " +
-      (job.crawlGraph.uniqueStates || "N/A") +
-      "\n";
-  }
-
-  const finalPrompt =
-    "You are a senior QA engineer. Based on these per-screen analyses of an Android app, generate a comprehensive report.\n\n" +
-    "User known pain points: " +
-    (opts.painPoints || "None specified") +
-    "\n" +
-    "User analysis goals: " +
-    (opts.goals || "General review") +
-    "\n" +
-    "Golden path: " +
-    (opts.goldenPath || "Not specified") +
-    "\n" +
-    crawlContext +
-    "\n" +
-    "Per-screen analyses:\n" +
-    screenAnalyses +
-    "\n\n" +
-    'Return a detailed JSON report with: {"overall_score":0-100,"summary":"","critical_bugs":[],"ux_issues":[],"suggestions":[],"quick_wins":[],"detailed_findings":[]}';
-
-  const finalResponse = await anthropic.messages.create({
-    model: REPORT_MODEL,
-    max_tokens: 4000,
-    messages: [{ role: "user", content: finalPrompt }],
-  });
-
-  return finalResponse.content[0].text;
 }
 
 module.exports = { processJob };

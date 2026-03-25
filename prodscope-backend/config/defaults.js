@@ -21,4 +21,9 @@ module.exports = {
   SATURATION_VISIT_THRESHOLD: 4,  // min visits before a feature can be saturated
   SATURATION_STALE_WINDOW: 3,     // consecutive visits with no new fingerprints = saturated
   COVERED_UNIQUE_SCREENS: 2,      // unique screens needed for "covered" status
+
+  // Oracle/triage thresholds (Week 4)
+  MAX_AI_TRIAGE_SCREENS: 8,       // max screens sent to AI vision analysis
+  ACCESSIBILITY_MIN_TAP_DP: 48,   // minimum tap target size in dp
+  SLOW_RESPONSE_THRESHOLD_MS: 3000, // screen transition > 3s = slow
 };
