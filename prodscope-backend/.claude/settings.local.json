@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"try { require\\(''''./server''''\\); } catch\\(e\\) { console.log\\(''''ERROR:'''', e.message\\); }\")",
+      "Bash(node -e \":*)",
+      "Bash(npm list:*)",
+      "Bash(where code-review-graph:*)",
+      "Bash(uv --version)",
+      "Bash(uvx code-review-graph:*)",
+      "Bash(where uv:*)",
+      "Bash(python -m code_review_graph --help)",
+      "Bash(uv run:*)",
+      "Bash(python:*)",
+      "Bash(node -c crawler/system-handlers.js)",
+      "Bash(node -c crawler/forms.js)",
+      "Bash(node -c brain/screen-classifier.js)",
+      "Bash(node -c crawler/run.js)",
+      "Bash(node -c crawler/actions.js)",
+      "Bash(npx jest:*)",
+      "Bash(node -e \"const pkg = require\\(''./package.json''\\); console.log\\(pkg.scripts\\)\")",
+      "Bash(node --test ./crawler/__tests__/*.test.js ./oracle/__tests__/*.test.js ./brain/__tests__/*.test.js)"
+    ]
+  }
+}

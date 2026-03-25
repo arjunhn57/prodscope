@@ -1,9 +1,5 @@
-﻿/**
- * run.js ΓÇö Main crawl loop orchestrator
- * Ties together all crawler modules into a single `runCrawl()` function
- * that replaces the inline crawl logic from index.js.
- *
- * Exports: runCrawl(config) ΓåÆ Promise<CrawlResult>
+/**
+ * run.js - Main crawl loop orchestrator
  */
 
 const fs = require('fs');
@@ -15,16 +11,22 @@ const forms = require('./forms');
 const graph = require('./graph');
 const systemHandlers = require('./system-handlers');
 const adb = require('./adb');
+const { detectScreenIntent } = require('./screen-intent');
+const screenClassifier = require('../brain/screen-classifier');
+const { CoverageTracker } = require('../brain/coverage-tracker');
+const { FlowTracker } = require('../brain/flow-tracker');
+const { FlowDeduplicator } = require('../brain/dedup');
+const { EmulatorWatchdog } = require('../emulator/watchdog');
+const checkpoint = require('./checkpoint');
+const { createInitialPlan, replan, currentTarget, advanceTarget } = require('../brain/planner');
+const crashDetector = require('../oracle/crash-detector');
+const anrDetector = require('../oracle/anr-detector');
+const uxHeuristics = require('../oracle/ux-heuristics');
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Execute an action on the device.
- * @param {object} action - Action object from actions.extract() or policy.choose()
- * @returns {string} Description of what was done
- */
 function executeAction(action) {
   switch (action.type) {
     case actions.ACTION_TYPES.TAP:
@@ -53,27 +55,115 @@ function executeAction(action) {
   }
 }
 
+function getPrimaryPackage(xml) {
+  if (!xml) return '';
+  const matches = [...xml.matchAll(/package="([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
+  if (!matches.length) return '';
+  const counts = {};
+  for (const pkg of matches) counts[pkg] = (counts[pkg] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
 /**
- * Run the crawl loop.
- *
- * @param {object} config
- * @param {string} config.screenshotDir - Directory to save screenshots
- * @param {string} config.packageName - App package name
- * @param {object} [config.credentials] - { username, password }
- * @param {string} [config.goldenPath] - User-provided golden path
- * @param {string} [config.goals] - Analysis goals
- * @param {string} [config.painPoints] - Known pain points
- * @param {number} [config.maxSteps=20] - Maximum crawl steps
- * @param {Function} [config.onProgress] - Called with (stepIndex, totalSteps)
- * @returns {Promise<CrawlResult>}
- *
- * @typedef {object} CrawlResult
- * @property {Array<object>} screens - Captured screen snapshots
- * @property {Array<object>} actionsTaken - Actions executed with outcomes
- * @property {object} graph - Serialized state graph
- * @property {string} stopReason - Why the crawl stopped
- * @property {Array<string>} reproPath - Ordered fingerprints for reproducibility
+ * Check if a package is a known system/framework package that may overlay
+ * the target app (e.g., permission dialogs, Google Play Services).
+ * Generic detection by prefix — no app-specific hardcoding.
  */
+function isAllowedNonTargetPackage(pkg) {
+  if (!pkg) return true;
+  if (pkg === 'android') return true;
+  // Android system components
+  if (pkg.startsWith('com.android.')) return true;
+  // Google Play Services / framework overlays
+  if (pkg.startsWith('com.google.android.gms')) return true;
+  if (pkg.startsWith('com.google.android.packageinstaller')) return true;
+  return false;
+}
+
+function isTransientEmptyXml(xml) {
+  if (!xml) return true;
+  const trimmed = String(xml).trim();
+  if (!trimmed) return true;
+  if (/null root node returned by UiTestAutomationBridge/i.test(trimmed)) return true;
+  if (/^ERROR:/i.test(trimmed)) return true;
+  return false;
+}
+
+function authSubmitScore(action) {
+  const haystack = `${action.text || ''} ${action.contentDesc || ''} ${action.resourceId || ''}`.toLowerCase();
+  const cls = (action.className || '').toLowerCase();
+
+  if (/(sign in|signin|log in|login)/i.test(haystack)) return 130;
+  if (/(continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack)) return 110;
+  if (/(sign up|signup|create account|register)/i.test(haystack)) return 90;
+  if (cls.includes('button') && haystack.trim()) return 80;
+  if (action.type === actions.ACTION_TYPES.TAP && haystack.trim()) return 60;
+  return 0;
+}
+
+function findBestAuthSubmitAction(candidates) {
+  const submitCandidates = candidates.filter((a) => {
+    if (a.type !== actions.ACTION_TYPES.TAP) return false;
+    const haystack = `${a.text || ''} ${a.contentDesc || ''} ${a.resourceId || ''}`.toLowerCase();
+    return /(sign up|signup|create account|register|sign in|signin|log in|login|continue|next|submit|done|finish|verify|confirm|get started|start)/i.test(haystack);
+  });
+
+  if (!submitCandidates.length) return null;
+
+  submitCandidates.sort((a, b) => authSubmitScore(b) - authSubmitScore(a));
+  return submitCandidates[0];
+}
+
+function makeAuthSubmitKey(action) {
+  return (
+    action.text ||
+    action.resourceId ||
+    action.contentDesc ||
+    'auth_submit_unknown'
+  )
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasValidationErrorText(xml) {
+  if (!xml) return false;
+  return /(invalid|required|already exists|already registered|password must|enter a valid|try again|error|incorrect|failed|unable|not available)/i.test(xml);
+}
+
+async function captureStableScreen(screenshotDir, index, maxRetries = 3, retryDelayMs = 2000) {
+  let snapshot = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    snapshot = screen.capture(screenshotDir, index);
+
+    if (!snapshot || snapshot.error === 'capture_failed' || snapshot.error === 'device_offline') {
+      return snapshot;
+    }
+
+    if (!isTransientEmptyXml(snapshot.xml)) {
+      return snapshot;
+    }
+
+    console.log(`  [crawler] Transient empty/null XML on capture ${index} (attempt ${attempt + 1}/${maxRetries + 1})`);
+    if (attempt < maxRetries) {
+      await sleep(retryDelayMs);
+    }
+  }
+
+  return snapshot;
+}
+
+async function relaunchTargetApp(packageName) {
+  console.log(`  [crawler] Relaunching target app: ${packageName}`);
+  adb.pressBack();
+  await sleep(1000);
+  adb.pressBack();
+  await sleep(1000);
+  adb.run(`adb shell monkey -p ${packageName} -c android.intent.category.LAUNCHER 1`, { ignoreError: true });
+  await sleep(5000);
+}
+
 async function runCrawl(config) {
   const {
     screenshotDir,
@@ -82,7 +172,7 @@ async function runCrawl(config) {
     goldenPath,
     goals,
     painPoints,
-    maxSteps = 20,
+    maxSteps = 60,
     onProgress,
   } = config;
 
@@ -93,19 +183,62 @@ async function runCrawl(config) {
   const screens = [];
   const actionsTaken = [];
   let stopReason = 'max_steps_reached';
+
   let consecutiveNoNewState = 0;
   const MAX_NO_NEW_STATE = 5;
-  let formFilledOnce = false;
+
   let consecutiveDeviceFails = 0;
   const MAX_DEVICE_FAILS = 3;
+
   let consecutiveCaptureFails = 0;
   const MAX_CAPTURE_FAILS = 3;
+
+  const handledFormScreens = new Set();
+  const filledFingerprints = new Set();
+
+  let authFillCount = 0;
+  const MAX_AUTH_FILLS = 5;
+
+  let outOfAppRecoveries = 0;
+  const MAX_OUT_OF_APP_RECOVERIES = 4;
+
+  let authFlowActive = false;
+  let authFlowStepsRemaining = 0;
+  const AUTH_FLOW_MAX_STEPS = 8;
+
+  // Brain modules (Week 2)
+  screenClassifier.clearCache();
+  const coverageTracker = new CoverageTracker();
+  const flowTracker = new FlowTracker();
+  const dedup = new FlowDeduplicator();
+  const fuzzyFpsByFeature = {}; // feature → Set of fuzzy fingerprints
+
+  // Watchdog + checkpoint + planner (Week 3)
+  const watchdog = new EmulatorWatchdog(packageName);
+  const sessionId = `crawl-${Date.now()}`;
+
+  // Create initial exploration plan (1 LLM call)
+  let plan = null;
+  const appProfile = config.appProfile || { packageName, activities: [], permissions: [] };
+  try {
+    plan = await createInitialPlan(appProfile, { goals, painPoints, goldenPath }, config.appCategory || 'unknown');
+    console.log(`[planner] Plan: targets=${plan.targets.join(', ')}, priority=${plan.priority}`);
+  } catch (e) {
+    console.log(`[planner] Plan creation failed, proceeding without plan: ${e.message}`);
+  }
+
+  let lastAuthSubmitKey = null;
+  let consecutiveSameAuthSubmit = 0;
+
+  // Oracle findings (Week 4)
+  const oracleFindings = {};  // step → findings[]
+  const MAX_SAME_AUTH_SUBMIT = 3;
+  const CHECKPOINT_INTERVAL = 5;
 
   for (let step = 0; step < maxSteps; step++) {
     if (onProgress) onProgress(step, maxSteps);
     console.log(`\n[crawler] === Step ${step + 1}/${maxSteps} ===`);
 
-    // 0. Device health check ΓÇö abort early if emulator disappeared
     if (!adb.isDeviceOnline()) {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device offline (attempt ${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
@@ -118,18 +251,28 @@ async function runCrawl(config) {
     }
     consecutiveDeviceFails = 0;
 
-    // 1. Capture current screen
-    const snapshot = screen.capture(screenshotDir, step);
+    // Watchdog health check
+    const health = watchdog.checkHealth();
+    if (!health.healthy) {
+      console.log(`  [watchdog] Unhealthy: ${health.detail} → ${health.action}`);
+      const recovered = await watchdog.recover(health.action);
+      if (!recovered) {
+        stopReason = 'emulator_failure';
+        break;
+      }
+      continue; // Re-enter loop after recovery
+    }
+    watchdog.reportProgress();
+
+    const snapshot = await captureStableScreen(screenshotDir, step, 3, 2000);
 
     if (!snapshot || snapshot.error === 'capture_failed') {
       consecutiveCaptureFails++;
       console.log(`  [crawler] Screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`);
-
       if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
         stopReason = 'capture_failed';
         break;
       }
-
       await sleep(2000);
       continue;
     }
@@ -137,12 +280,10 @@ async function runCrawl(config) {
     if (snapshot.error === 'device_offline') {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device lost during capture (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
-
       if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
         stopReason = 'device_offline';
         break;
       }
-
       await sleep(3000);
       continue;
     }
@@ -151,30 +292,12 @@ async function runCrawl(config) {
     consecutiveDeviceFails = 0;
     screens.push(snapshot);
 
-    // 2. Compute fingerprint
-    const fp = fingerprint.compute(snapshot.xml);
-    const isNew = !stateGraph.isVisited(fp);
-    console.log(
-      `  [crawler] Fingerprint: ${fp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) activity=${snapshot.activity}`,
-    );
+    const primaryPackage = getPrimaryPackage(snapshot.xml);
+    console.log(`  [crawler] Primary package: ${primaryPackage || 'unknown'}`);
 
-    // 3. Track new-state detection for stop condition
-    if (isNew) {
-      consecutiveNoNewState = 0;
-    } else {
-      consecutiveNoNewState++;
-      if (consecutiveNoNewState >= MAX_NO_NEW_STATE) {
-        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state ΓÇö stopping`);
-        stopReason = 'no_new_states';
-        stateGraph.addState(fp, snapshot);
-        break;
-      }
-    }
+    const screenIntent = detectScreenIntent(snapshot.xml);
+    console.log(`  [intent] type=${screenIntent.type} confidence=${screenIntent.confidence}`);
 
-    // 4. Add state to graph
-    stateGraph.addState(fp, snapshot);
-
-    // 5. Handle system dialogs first
     const sysResult = systemHandlers.check(snapshot.xml);
     if (sysResult.handled) {
       actionsTaken.push({
@@ -182,75 +305,263 @@ async function runCrawl(config) {
         type: 'system_handler',
         handler: sysResult.handler,
         description: sysResult.action,
-        fromFingerprint: fp,
       });
       await sleep(1500);
       continue;
     }
 
-    // 6. Detect and fill forms (only if credentials provided and not already filled)
-    if (credentials && !formFilledOnce) {
-      const formResult = forms.detectForm(snapshot.xml);
-      if (formResult.isForm) {
-        console.log(`  [crawler] Login/signup form detected with ${formResult.fields.length} fields`);
-        const fillActions = await forms.fillForm(formResult.fields, credentials, sleep);
+    if (primaryPackage && primaryPackage !== packageName && !isAllowedNonTargetPackage(primaryPackage)) {
+      outOfAppRecoveries++;
+      console.log(`  [crawler] Out-of-app screen detected: ${primaryPackage} (target=${packageName})`);
 
-        if (fillActions.length > 0) {
-          formFilledOnce = true;
-          actionsTaken.push({
-            step,
-            type: 'form_fill',
-            fields: fillActions,
-            fromFingerprint: fp,
-          });
+      if (outOfAppRecoveries > MAX_OUT_OF_APP_RECOVERIES) {
+        stopReason = 'left_target_app';
+        break;
+      }
 
-          await sleep(1000);
+      await relaunchTargetApp(packageName);
+      continue;
+    }
 
-          const submitXml = adb.dumpXml();
-          const submitCandidates = actions.extract(submitXml);
-          const submitBtn = submitCandidates.find(
-            (a) =>
-              a.type === actions.ACTION_TYPES.TAP &&
-              /(login|sign.in|submit|continue|next|log.in)/i.test(`${a.text} ${a.contentDesc} ${a.resourceId}`),
-          );
+    outOfAppRecoveries = 0;
 
-          if (submitBtn) {
-            const submitDescription = executeAction(submitBtn);
-            actionsTaken.push({
-              step,
-              type: 'form_submit',
-              description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
-              fromFingerprint: fp,
-            });
-            console.log(`  [crawler] ${submitDescription}`);
-            console.log(`  [crawler] Tapped submit button after form fill`);
+    const fp = fingerprint.compute(snapshot.xml);
+    const fuzzyFp = fingerprint.computeFuzzy(snapshot.xml, snapshot.activity);
+    const isNew = !stateGraph.isVisited(fp);
+
+    // Classify screen and track coverage
+    const classification = screenClassifier.classify(snapshot.xml, snapshot.activity, fp);
+    const { type: screenType, feature } = classification;
+
+    coverageTracker.recordVisit(feature, fp, screenType);
+    dedup.updateFeatureProfile(feature, snapshot.xml);
+
+    // Track fuzzy fingerprints per feature
+    if (!fuzzyFpsByFeature[feature]) fuzzyFpsByFeature[feature] = new Set();
+    fuzzyFpsByFeature[feature].add(fuzzyFp);
+
+    // Flow tracking
+    const isNavHub = screenType === 'navigation_hub';
+    flowTracker.checkFlowComplete(screenType, isNavHub);
+    if (isNavHub) {
+      flowTracker.startFlow(screenType, feature);
+    }
+
+    // Replan at navigation hubs every ~15 steps (CLAUDE.md Section 3, Step I)
+    if (isNavHub && step > 0 && step % 15 === 0) {
+      try {
+        const keyLabels = [];
+        const labelMatches = (snapshot.xml || '').match(/text="([^"]+)"/gi);
+        if (labelMatches) {
+          for (const m of labelMatches) {
+            const val = m.match(/text="([^"]+)"/i);
+            if (val && val[1].length > 1 && val[1].length < 40) keyLabels.push(val[1]);
           }
+        }
+        console.log(`  [planner] Replanning at navigation hub (step ${step})`);
+        plan = await replan(plan, coverageTracker.summary(), {
+          screenType,
+          activity: snapshot.activity,
+          keyLabels: keyLabels.slice(0, 10),
+        });
+      } catch (e) {
+        console.log(`  [planner] Replan failed: ${e.message}`);
+      }
+    }
 
-          if (!adb.ensureDeviceReady()) {
-            consecutiveDeviceFails++;
-            console.log(`  [crawler] Device not ready after form submit (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
-            if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
-              stopReason = 'device_offline';
-              break;
-            }
-          }
+    console.log(
+      `  [crawler] Fingerprint: ${fp} fuzzy=${fuzzyFp} (${isNew ? 'NEW' : 'visited ' + stateGraph.visitCount(fp) + 'x'}) type=${screenType} feature=${feature} activity=${snapshot.activity}`,
+    );
 
-          await sleep(2000);
-          continue;
+    if (authFlowActive) {
+      if (screenIntent.type.startsWith('auth') || screenIntent.type.includes('login') || screenIntent.type.includes('signup') || screenIntent.type === 'email_entry' || screenIntent.type === 'phone_entry' || screenIntent.type === 'otp_verification') {
+        authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
+        console.log('  [crawler] Auth flow still active');
+      } else {
+        authFlowStepsRemaining--;
+        if (authFlowStepsRemaining <= 0) {
+          authFlowActive = false;
+          lastAuthSubmitKey = null;
+          consecutiveSameAuthSubmit = 0;
+          console.log('  [crawler] Auth flow expired');
         }
       }
     }
 
-    // 7. Extract candidate actions (filtering already-tried ones)
+    if (isNew) {
+      consecutiveNoNewState = 0;
+    } else {
+      consecutiveNoNewState++;
+      if (consecutiveNoNewState >= MAX_NO_NEW_STATE) {
+        console.log(`  [crawler] ${MAX_NO_NEW_STATE} consecutive steps with no new state - stopping`);
+        stopReason = 'no_new_states';
+        stateGraph.addState(fp, snapshot);
+        break;
+      }
+    }
+
+    stateGraph.addState(fp, snapshot);
+
+    // Coverage-gated skip: if this feature is saturated, back out
+    if (coverageTracker.isSaturated(feature) && !authFlowActive && screenType !== 'navigation_hub') {
+      const dedupCheck = dedup.shouldSkipScreen(feature, fuzzyFp, fuzzyFpsByFeature[feature], snapshot.xml);
+      if (dedupCheck.skip) {
+        console.log(`  [brain] Skipping saturated feature=${feature} (${dedupCheck.reason})`);
+        adb.pressBack();
+        actionsTaken.push({ step, type: 'coverage_skip', description: `back (${feature} saturated)`, reason: dedupCheck.reason });
+        await sleep(1500);
+        continue;
+      }
+    }
+
+    if (credentials && authFillCount < MAX_AUTH_FILLS) {
+      const formResult = forms.detectForm(snapshot.xml);
+
+      if (formResult.isForm) {
+        const formKey = `${fp}::${formResult.fields.map((f) => f.type).sort().join('|')}`;
+
+        if (!handledFormScreens.has(formKey)) {
+          console.log(`  [crawler] Login/signup form detected with ${formResult.fields.length} fields`);
+
+          const fillActions = await forms.fillForm(formResult.fields, credentials, sleep);
+
+          if (fillActions.length > 0) {
+            handledFormScreens.add(formKey);
+            filledFingerprints.add(fp);
+            authFillCount++;
+            authFlowActive = true;
+            authFlowStepsRemaining = AUTH_FLOW_MAX_STEPS;
+
+            actionsTaken.push({
+              step,
+              type: 'form_fill',
+              fields: fillActions,
+              fromFingerprint: fp,
+            });
+
+            await sleep(1000);
+
+            const submitXml = adb.dumpXml();
+            const submitCandidates = actions.extract(submitXml);
+            const submitBtn = findBestAuthSubmitAction(submitCandidates);
+
+            if (submitBtn) {
+              const submitKey = makeAuthSubmitKey(submitBtn);
+
+              if (submitKey === lastAuthSubmitKey) {
+                consecutiveSameAuthSubmit++;
+              } else {
+                lastAuthSubmitKey = submitKey;
+                consecutiveSameAuthSubmit = 1;
+              }
+
+              const submitDescription = executeAction(submitBtn);
+
+              actionsTaken.push({
+                step,
+                type: 'form_submit',
+                description: `Tapped submit: "${submitBtn.text || submitBtn.resourceId}"`,
+                fromFingerprint: fp,
+              });
+
+              console.log(`  [crawler] ${submitDescription}`);
+              console.log('  [crawler] Tapped submit button after form fill');
+
+              if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
+                const xmlNow = adb.dumpXml() || '';
+                if (hasValidationErrorText(xmlNow)) {
+                  console.log('  [crawler] Validation error detected after repeated auth submit');
+                  stopReason = 'auth_validation_error';
+                  break;
+                }
+
+                console.log('  [crawler] Repeated semantic auth submit loop detected after form fill');
+                stopReason = 'auth_submit_loop';
+                break;
+              }
+            } else {
+              console.log('  [crawler] No auth submit button found after form fill');
+            }
+
+            if (!adb.ensureDeviceReady()) {
+              consecutiveDeviceFails++;
+              console.log(`  [crawler] Device not ready after form submit (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
+              if (consecutiveDeviceFails >= MAX_DEVICE_FAILS) {
+                stopReason = 'device_offline';
+                break;
+              }
+            }
+
+            await sleep(2500);
+            continue;
+          }
+        }
+      }
+    }
+
     const tried = stateGraph.triedActionsFor(fp);
-    const candidates = actions.extract(snapshot.xml, tried);
+    let candidates = actions.extract(snapshot.xml, tried);
+
+    if (screenIntent.type === 'auth_choice' || screenIntent.type === 'phone_entry' || screenIntent.type === 'email_entry') {
+      const authSubmit = findBestAuthSubmitAction(candidates);
+      if (authSubmit) {
+        candidates = [authSubmit, ...candidates.filter((a) => a.key !== authSubmit.key)];
+        console.log(`  [intent] Prioritizing auth CTA for ${screenIntent.type}`);
+      }
+    }
+
+    if (filledFingerprints.has(fp) || authFlowActive || screenIntent.type.startsWith('auth') || screenIntent.type.includes('login') || screenIntent.type.includes('signup') || screenIntent.type === 'email_entry' || screenIntent.type === 'phone_entry' || screenIntent.type === 'otp_verification') {
+      const authSubmit = findBestAuthSubmitAction(candidates);
+
+      if (authSubmit) {
+        const authKey = makeAuthSubmitKey(authSubmit);
+
+        if (authKey === lastAuthSubmitKey) {
+          consecutiveSameAuthSubmit++;
+        } else {
+          lastAuthSubmitKey = authKey;
+          consecutiveSameAuthSubmit = 1;
+        }
+
+        if (consecutiveSameAuthSubmit >= MAX_SAME_AUTH_SUBMIT) {
+          if (hasValidationErrorText(snapshot.xml)) {
+            console.log('  [crawler] Validation error detected on repeated auth CTA screen');
+            stopReason = 'auth_validation_error';
+            break;
+          }
+
+          console.log('  [crawler] Repeated semantic auth submit loop detected');
+          stopReason = 'auth_submit_loop';
+          break;
+        }
+
+        candidates = [
+          authSubmit,
+          ...candidates.filter((a) => a.key !== authSubmit.key && a.type !== actions.ACTION_TYPES.TYPE),
+        ];
+        console.log('  [crawler] Prioritizing auth CTA in auth flow');
+      } else {
+        candidates = candidates.filter((a) => a.type !== actions.ACTION_TYPES.TYPE);
+        console.log('  [crawler] Suppressing extra TYPE actions in auth flow');
+      }
+    } else {
+      lastAuthSubmitKey = null;
+      consecutiveSameAuthSubmit = 0;
+    }
+
     console.log(`  [crawler] ${candidates.length} candidate actions (${tried.size} already tried)`);
 
-    // 8. Let policy choose the best action
+    // Advance plan target if current one is covered
+    if (plan && currentTarget(plan) && coverageTracker.isCovered(currentTarget(plan))) {
+      console.log(`  [planner] Target '${currentTarget(plan)}' covered, advancing`);
+      advanceTarget(plan);
+    }
+
     const decision = policy.choose(candidates, stateGraph, fp, {
       goldenPath,
       goals,
       painPoints,
+      plan,
     });
 
     if (decision.action.type === 'stop') {
@@ -259,9 +570,12 @@ async function runCrawl(config) {
       break;
     }
 
-    // 9. Execute the chosen action
     const description = executeAction(decision.action);
     console.log(`  [crawler] Executed: ${description} (reason: ${decision.reason})`);
+
+    // Record step in flow tracker
+    const actionTarget = decision.action.text || decision.action.resourceId || decision.action.contentDesc || '';
+    flowTracker.addStep(screenType, decision.action.type, actionTarget, fp);
 
     if (!adb.ensureDeviceReady()) {
       consecutiveDeviceFails++;
@@ -274,7 +588,6 @@ async function runCrawl(config) {
       continue;
     }
 
-    // 10. Record transition
     const actionKey = decision.action.key || description;
     actionsTaken.push({
       step,
@@ -285,14 +598,52 @@ async function runCrawl(config) {
       fromFingerprint: fp,
     });
 
-    // Wait for the screen to settle
+    // Oracle checks after action (Week 4)
+    const preActionTs = Date.now();
     await sleep(2000);
 
-    // Capture post-action fingerprint for the graph edge
-    const postSnapshot = screen.capture(screenshotDir, `${step}_post`);
-    if (postSnapshot && !postSnapshot.error) {
+    const stepFindings = [];
+
+    // Crash detection (logcat-based, no screen needed)
+    const crashResult = crashDetector.checkCrash(packageName);
+    if (crashResult.crashed) {
+      stepFindings.push({
+        type: 'crash',
+        severity: 'critical',
+        detail: `App crashed: ${crashResult.exceptionType}`,
+        step,
+        stackTrace: crashResult.stackTrace,
+      });
+      console.log(`  [oracle] CRASH detected: ${crashResult.exceptionType}`);
+      crashDetector.clearLogcat();
+    }
+
+    // Capture post-action screen (needed for ANR XML check + UX heuristics)
+    const postSnapshot = await captureStableScreen(screenshotDir, `${step}_post`, 2, 1500);
+
+    // ANR detection (dual: XML dialog check + dumpsys fallback)
+    const anrResult = anrDetector.checkANR(packageName, postSnapshot ? postSnapshot.xml : null);
+    if (anrResult.anrDetected) {
+      stepFindings.push({
+        type: 'anr',
+        severity: 'high',
+        detail: `ANR: ${anrResult.detail}`,
+        step,
+        source: anrResult.source,
+      });
+      console.log(`  [oracle] ANR detected: ${anrResult.source}`);
+      anrDetector.dismissANR();
+    }
+
+    if (postSnapshot && !postSnapshot.error && !isTransientEmptyXml(postSnapshot.xml)) {
       const postFp = fingerprint.compute(postSnapshot.xml);
       stateGraph.addTransition(fp, actionKey, postFp);
+
+      // UX heuristic checks on post-action screen
+      const uxFindings = uxHeuristics.runAllChecks(postSnapshot.xml, preActionTs);
+      for (const f of uxFindings) {
+        stepFindings.push({ ...f, step });
+      }
     } else if (postSnapshot && postSnapshot.error === 'device_offline') {
       consecutiveDeviceFails++;
       console.log(`  [crawler] Device lost during post-action capture (${consecutiveDeviceFails}/${MAX_DEVICE_FAILS})`);
@@ -302,24 +653,64 @@ async function runCrawl(config) {
       }
     } else if (postSnapshot && postSnapshot.error === 'capture_failed') {
       consecutiveCaptureFails++;
-      console.log(
-        `  [crawler] Post-action screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`,
-      );
+      console.log(`  [crawler] Post-action screenshot capture failed (${consecutiveCaptureFails}/${MAX_CAPTURE_FAILS})`);
       if (consecutiveCaptureFails >= MAX_CAPTURE_FAILS) {
         stopReason = 'capture_failed';
         break;
       }
     }
+
+    // Store step findings
+    if (stepFindings.length > 0) {
+      oracleFindings[step] = stepFindings;
+      console.log(`  [oracle] ${stepFindings.length} finding(s) at step ${step}`);
+    }
+
+    // Checkpoint every N steps
+    if ((step + 1) % CHECKPOINT_INTERVAL === 0) {
+      try {
+        checkpoint.save(sessionId, step, {
+          stateGraph: stateGraph.toJSON(),
+          coverage: coverageTracker.serialize(),
+          flows: flowTracker.serialize(),
+          plan,
+        });
+        console.log(`  [checkpoint] Saved at step ${step + 1}`);
+      } catch (e) {
+        console.log(`  [checkpoint] Save failed: ${e.message}`);
+      }
+    }
+  }
+
+  // Finalize any in-progress flow
+  flowTracker.finalizeCurrentFlow('crawl_ended');
+
+  // Register completed flows with dedup
+  for (const flow of flowTracker.getFlows()) {
+    dedup.registerFlow(flow);
+  }
+
+  // Flatten oracle findings for result
+  const allFindings = [];
+  for (const [step, findings] of Object.entries(oracleFindings)) {
+    for (const f of findings) allFindings.push(f);
   }
 
   const result = {
-    screens: screens.map((s) => ({
-      index: s.index,
-      path: s.screenshotPath,
-      activity: s.activity,
-      timestamp: s.timestamp,
-      xml: s.xml,
-    })),
+    screens: screens.map((s, i) => {
+      const cls = screenClassifier.classify(s.xml, s.activity, fingerprint.compute(s.xml));
+      return {
+        index: s.index,
+        path: s.screenshotPath,
+        activity: s.activity,
+        timestamp: s.timestamp,
+        xml: s.xml,
+        step: i,
+        screenType: cls.type,
+        feature: cls.feature,
+        fuzzyFp: fingerprint.computeFuzzy(s.xml, s.activity),
+      };
+    }),
     actionsTaken,
     graph: stateGraph.toJSON(),
     stopReason,
@@ -328,8 +719,20 @@ async function runCrawl(config) {
       totalSteps: screens.length,
       uniqueStates: stateGraph.uniqueStateCount(),
       totalTransitions: stateGraph.transitions.length,
+      stopReason,
     },
+    coverage: coverageTracker.summary(),
+    flows: flowTracker.getFlows(),
+    plan,
+    classifierCacheSize: screenClassifier.cacheSize(),
+    oracleFindings: allFindings,
+    oracleFindingsByStep: oracleFindings,
   };
+
+  // Cleanup checkpoints on successful completion
+  try {
+    checkpoint.cleanup(sessionId);
+  } catch (e) {}
 
   console.log(
     `\n[crawler] Crawl complete: ${result.stats.totalSteps} steps, ${result.stats.uniqueStates} unique states, stop reason: ${stopReason}`,

@@ -1,5 +1,5 @@
 /**
- * actions.js — Action extraction and ranking from UI XML
+ * actions.js - Action extraction and ranking from UI XML
  * Parses uiautomator XML to find candidate user actions and ranks them
  * deterministically so the crawler never picks randomly.
  */
@@ -39,14 +39,6 @@ function actionKey(action) {
 
 /**
  * Compute priority score for an action. Higher = should be tried first.
- *
- * Priority tiers:
- *   100 — editable text fields (forms)
- *    80 — buttons / clickables with meaningful text/description
- *    60 — navigation elements (tabs, drawer items)
- *    40 — generic clickable elements
- *    20 — scroll actions
- *    10 — back button
  */
 function scorePriority(action) {
   if (action.type === ACTION_TYPES.TYPE) return 100;
@@ -57,32 +49,39 @@ function scorePriority(action) {
     const desc = (action.contentDesc || '').toLowerCase();
     const rid = (action.resourceId || '').toLowerCase();
 
-    // Primary CTAs (highest priority among taps)
-    const primaryKeywords = ['login', 'sign in', 'sign up', 'register', 'submit', 'continue', 'next', 'log in', 'get started', 'allow', 'done', 'finish'];
+    const primaryKeywords = [
+      'login',
+      'sign in',
+      'sign up',
+      'register',
+      'submit',
+      'continue',
+      'next',
+      'log in',
+      'get started',
+      'allow',
+      'done',
+      'finish',
+    ];
     if (primaryKeywords.some(k => text.includes(k) || desc.includes(k) || rid.includes(k))) return 90;
 
-    // Buttons with text
     if ((cls.includes('button') || cls.includes('textview')) && (text || desc)) return 80;
 
-    // Navigation items
     if (cls.includes('tab') || cls.includes('bottomnavigation') || rid.includes('nav') || rid.includes('tab')) return 60;
 
-    // Image buttons, icons with description
     if (cls.includes('imagebutton') || cls.includes('imageview')) {
       return desc ? 55 : 30;
     }
 
-    // Generic clickable with some identifying info
     if (text || desc || rid.length > 3) return 50;
 
-    // Junk elements (empty div, generic frame layout with no identifier)
     if (action.bounds) {
-       const height = action.bounds.y2 - action.bounds.y1;
-       const width = action.bounds.x2 - action.bounds.x1;
-       if (height < 20 && width < 20) return -10; // Penalize tiny junk
+      const height = action.bounds.y2 - action.bounds.y1;
+      const width = action.bounds.x2 - action.bounds.x1;
+      if (height < 20 && width < 20) return -10;
     }
 
-    return 20; // Lower baseline priority for bare generic elements
+    return 20;
   }
 
   if (action.type === ACTION_TYPES.SCROLL_DOWN || action.type === ACTION_TYPES.SCROLL_UP) return 20;
@@ -104,6 +103,17 @@ function extract(xml, triedActions = new Set()) {
   const nodeRegex = /<node\s+([^>]+)\/?>/g;
   let m;
 
+  // Block actions from system/framework packages generically by prefix.
+  // This avoids hardcoding specific Google/OEM app package names.
+  const BLOCKED_PACKAGE_PREFIXES = [
+    'com.android.',        // System UI, settings, launcher, etc.
+    'com.google.android.', // Google apps (launcher, calendar, photos, etc.)
+  ];
+  const isBlockedPackage = (pkg) => {
+    if (!pkg) return false;
+    return BLOCKED_PACKAGE_PREFIXES.some((prefix) => pkg.startsWith(prefix));
+  };
+
   while ((m = nodeRegex.exec(xml)) !== null) {
     const attrs = m[1];
     const get = (name) => {
@@ -118,25 +128,26 @@ function extract(xml, triedActions = new Set()) {
     const boundsStr = get('bounds');
     const bounds = parseBounds(boundsStr);
     const pkg = get('package').toLowerCase();
+    const text = get('text');
+    const contentDesc = get('content-desc');
+    const resourceId = get('resource-id');
 
     if (!bounds) continue;
-    if (!enabled) continue; // Skip disabled elements
+    if (!enabled) continue;
 
-    // Immediately skip system UI framework overlays to avoid random settings toggles or quick settings expansion
-    if (pkg === 'com.android.systemui' || pkg === 'com.android.settings') continue;
+    if (isBlockedPackage(pkg)) continue;
 
-    // Skip off-screen or invisible elements (assuming 1080x1920 device)
     if (bounds.cx < 0 || bounds.cy < 0 || bounds.cx > 1200 || bounds.cy > 2400) continue;
-    // Skip tiny elements (< 10px in any dimension)
     if ((bounds.x2 - bounds.x1) < 10 || (bounds.y2 - bounds.y1) < 10) continue;
 
     const base = {
       className: get('class'),
-      text: get('text'),
-      contentDesc: get('content-desc'),
-      resourceId: get('resource-id'),
+      text,
+      contentDesc,
+      resourceId,
       bounds,
       boundsStr,
+      packageName: pkg,
     };
 
     if (editable) {
@@ -161,11 +172,9 @@ function extract(xml, triedActions = new Set()) {
     }
   }
 
-  // Always add BACK as a fallback
   const backAction = { type: ACTION_TYPES.BACK, priority: 10, key: 'back', bounds: null };
   if (!triedActions.has(backAction.key)) actions.push(backAction);
 
-  // Sort by priority descending, stable
   actions.sort((a, b) => b.priority - a.priority);
   return actions;
 }
