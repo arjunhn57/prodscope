@@ -9,4 +9,14 @@ app.log
 .vercel
 .vscode/
 .idea/
-prodscope-backend/data/
+
+# Backup/patch artifacts (never commit these)
+*.bak_*
+*.before_*
+*.good_*
+*.working_*
+*.pre_*
+patch-*.cjs
+served-app.html
+vm-files/
+prodscope-backend/
