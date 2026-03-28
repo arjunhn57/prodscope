@@ -20,3 +20,4 @@ patch-*.cjs
 served-app.html
 vm-files/
 prodscope-backend/
+.claude/
