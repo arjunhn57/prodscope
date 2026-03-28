@@ -407,7 +407,12 @@ svg{flex-shrink:0;}
   </div>
 
   <div class="live-panel-body">
-    <div class="live-panel-thumb" id="livePanelThumb">Waiting for first screen…</div>
+    <div class="live-panel-thumb" id="livePanelThumb">
+      <div class="live-badge" id="liveBadge" style="display:none;">LIVE</div>
+      <img id="liveImgA" class="live-buf" alt="Live emulator stream" />
+      <img id="liveImgB" class="live-buf" alt="Live emulator stream" />
+      <div class="live-placeholder" id="livePlaceholder">Waiting for first screen…</div>
+    </div>
 
     <div>
       <div class="live-panel-grid">
@@ -953,6 +958,7 @@ async function startAnalysis(){
 function startNew(){
   stopTimer();
   stopPolling();
+  stopLiveStream();
   removeFile();
   document.getElementById('painPoints').value = '';
   document.getElementById('goldenPath').value = '';
@@ -962,27 +968,44 @@ function startNew(){
   showPage('analyze');
 }
 
+// ── Metadata-only preview updater (used by polling fallback) ─────────────
 function renderLivePreview(live, jobId) {
-  const panel = document.getElementById('livePanel');
+  var panel = document.getElementById('livePanel');
   if (!panel || !live) return;
-
   panel.classList.add('show');
+  _updateLiveMetadata(live);
 
-  const phase = String(live.phase || 'running');
-  const dot = document.getElementById('livePanelDot');
-  const phaseEl = document.getElementById('livePanelPhase');
-  const counterEl = document.getElementById('livePanelCounter');
-  const activityEl = document.getElementById('livePanelActivity');
-  const intentEl = document.getElementById('livePanelIntent');
-  const actionEl = document.getElementById('livePanelAction');
-  const captureEl = document.getElementById('livePanelCapture');
-  const messageEl = document.getElementById('livePanelMessage');
-  const thumbEl = document.getElementById('livePanelThumb');
+  // If stream is NOT active, use polling-based image refresh as fallback
+  if (!window.__liveStreamActive) {
+    var base = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : '';
+    var phase = String(live.phase || 'running');
+    if (jobId && phase !== 'complete' && phase !== 'failed') {
+      var imgA = document.getElementById('liveImgA');
+      if (imgA) {
+        imgA.src = base + '/api/job-live-stream/' + encodeURIComponent(jobId) + '?single=1&t=' + Date.now();
+        imgA.style.opacity = '1';
+        var placeholder = document.getElementById('livePlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+      }
+    }
+  }
+}
+
+function _updateLiveMetadata(live) {
+  var phase = String(live.phase || 'running');
+  var dot = document.getElementById('livePanelDot');
+  var phaseEl = document.getElementById('livePanelPhase');
+  var counterEl = document.getElementById('livePanelCounter');
+  var activityEl = document.getElementById('livePanelActivity');
+  var intentEl = document.getElementById('livePanelIntent');
+  var actionEl = document.getElementById('livePanelAction');
+  var captureEl = document.getElementById('livePanelCapture');
+  var messageEl = document.getElementById('livePanelMessage');
 
   if (dot) dot.className = 'live-panel-dot ' + phase;
   if (phaseEl) phaseEl.textContent = phase.replace(/_/g, ' ');
 
-  const stepPart = (live.rawStep != null && live.maxRawSteps != null)
+  var stepPart = (live.rawStep != null && live.maxRawSteps != null)
     ? (live.rawStep + '/' + live.maxRawSteps)
     : ((live.countedUniqueScreens != null && live.targetUniqueScreens != null)
       ? (live.countedUniqueScreens + '/' + live.targetUniqueScreens)
@@ -992,119 +1015,322 @@ function renderLivePreview(live, jobId) {
   if (activityEl) activityEl.textContent = live.activity || live.packageName || '-';
   if (intentEl) intentEl.textContent = live.intentType || '-';
 
-  let actionText = '-';
+  var actionText = '-';
   if (live.latestAction && typeof live.latestAction === 'object') {
-    actionText = [
-      live.latestAction.type,
-      live.latestAction.description,
-      live.latestAction.decisionSource
-    ].filter(Boolean).join(': ');
+    actionText = [live.latestAction.type, live.latestAction.description, live.latestAction.decisionSource].filter(Boolean).join(': ');
   } else if (live.latestAction) {
     actionText = String(live.latestAction);
   }
   if (actionEl) actionEl.textContent = actionText;
   if (captureEl) captureEl.textContent = live.captureMode || (live.screenshotUnavailable ? 'xml_only' : '-');
   if (messageEl) messageEl.textContent = live.message || live.stopReason || 'Live progress update';
+}
 
-  const base = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : window.location.origin;
+// ── Stream lifecycle ─────────────────────────────────────────────────────
+window.__liveStreamActive = false;
+window.__liveStreamStarted = false;
+window.__liveStreamController = null;
+window.__liveStreamCurrentFront = 'A';
+window.__liveStreamOldBlobUrl = null;
 
-  if (thumbEl && jobId) {
-    let img = document.getElementById('livePanelStream');
-    if (!img) {
-      thumbEl.innerHTML = '';
-      img = document.createElement('img');
-      img.id = 'livePanelStream';
-      img.alt = 'Live emulator stream';
-      img.style.maxWidth = '100%';
-      img.style.maxHeight = '100%';
-      img.style.display = 'block';
-      thumbEl.appendChild(img);
+function stopLiveStream() {
+  if (window.__liveStreamController) {
+    try { window.__liveStreamController.abort(); } catch (e) {}
+    window.__liveStreamController = null;
+  }
+  window.__liveStreamActive = false;
+  window.__liveStreamStarted = false;
+
+  // Reset double-buffer
+  var imgA = document.getElementById('liveImgA');
+  var imgB = document.getElementById('liveImgB');
+  if (imgA) { imgA.style.opacity = '0'; imgA.src = ''; }
+  if (imgB) { imgB.style.opacity = '0'; imgB.src = ''; }
+  var badge = document.getElementById('liveBadge');
+  if (badge) badge.style.display = 'none';
+  var ph = document.getElementById('livePlaceholder');
+  if (ph) { ph.style.display = ''; ph.textContent = 'Waiting for first screen\u2026'; }
+
+  if (window.__liveStreamOldBlobUrl) {
+    URL.revokeObjectURL(window.__liveStreamOldBlobUrl);
+    window.__liveStreamOldBlobUrl = null;
+  }
+}
+
+// ── Multipart stream helpers ─────────────────────────────────────────────
+function _concatBufs(a, b) {
+  var c = new Uint8Array(a.length + b.length);
+  c.set(a, 0);
+  c.set(b, a.length);
+  return c;
+}
+
+function _findBytes(haystack, needle, offset) {
+  for (var i = offset || 0; i <= haystack.length - needle.length; i++) {
+    var match = true;
+    for (var j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) { match = false; break; }
     }
+    if (match) return i;
+  }
+  return -1;
+}
 
-    if (!img.dataset.boundRetry) {
-      img.dataset.boundRetry = '1';
-
-      img.onerror = function () {
-        const phaseNow = img.dataset.phase || '';
-        if (phaseNow === 'complete' || phaseNow === 'failed') return;
-
-        const retryCount = Number(img.dataset.retryCount || '0') + 1;
-        img.dataset.retryCount = String(retryCount);
-
-        const delay = Math.min(4000, Math.max(1000, retryCount * 1000));
-        clearTimeout(img.__retryTimer);
-
-        img.__retryTimer = setTimeout(function () {
-          const streamBase = img.dataset.streamBase;
-          if (streamBase) {
-            img.src = streamBase + '?retry=' + Date.now();
-          }
-        }, delay);
-      };
-
-      img.onload = function () {
-        img.dataset.retryCount = '0';
-      };
+function _parseFrameHeaders(headerBytes) {
+  var text = new TextDecoder().decode(headerBytes);
+  var headers = {};
+  var lines = text.split('\r\n');
+  for (var i = 0; i < lines.length; i++) {
+    var colon = lines[i].indexOf(':');
+    if (colon > 0) {
+      headers[lines[i].substring(0, colon).trim().toLowerCase()] = lines[i].substring(colon + 1).trim();
     }
+  }
+  return headers;
+}
 
-    const srcBase = base + '/api/job-live-stream/' + encodeURIComponent(jobId);
-    const currentJob = String(jobId);
+/**
+ * Try to extract one complete multipart frame from the buffer.
+ * Returns { headers, body, remaining } or null if incomplete.
+ */
+function _extractFrame(buffer) {
+  var boundaryBytes = new TextEncoder().encode('--frame\r\n');
+  var sepBytes = new TextEncoder().encode('\r\n\r\n');
 
-    if (img.dataset.jobId !== currentJob) {
-      img.dataset.jobId = currentJob;
-      img.dataset.phase = phase;
-      img.dataset.streamBase = srcBase;
-      img.dataset.retryCount = '0';
-      delete img.dataset.terminalPhase;
-      clearTimeout(img.__retryTimer);
-      img.src = srcBase + '?t=' + Date.now();
+  // Find boundary
+  var bStart = _findBytes(buffer, boundaryBytes, 0);
+  if (bStart === -1) return null;
+
+  // Find header/body separator after boundary
+  var headerStart = bStart + boundaryBytes.length;
+  var sepPos = _findBytes(buffer, sepBytes, headerStart);
+  if (sepPos === -1) return null;
+
+  // Parse headers
+  var headerSlice = buffer.slice(headerStart, sepPos);
+  var headers = _parseFrameHeaders(headerSlice);
+
+  var bodyStart = sepPos + sepBytes.length;
+  var contentLength = parseInt(headers['content-length'] || '0', 10);
+
+  // Check if we have the full body + trailing \r\n
+  if (buffer.length < bodyStart + contentLength + 2) return null;
+
+  var body = buffer.slice(bodyStart, bodyStart + contentLength);
+  var remaining = buffer.slice(bodyStart + contentLength + 2); // skip \r\n after body
+
+  return { headers: headers, body: body, remaining: remaining };
+}
+
+// ── Display a frame with double-buffer crossfade ─────────────────────────
+function _displayFrame(body, headers) {
+  if (!body || body.length === 0) return;
+
+  var blob = new Blob([body], { type: 'image/png' });
+  var url = URL.createObjectURL(blob);
+
+  // Determine which buffer is hidden (load into it)
+  var front = window.__liveStreamCurrentFront;
+  var backId = (front === 'A') ? 'liveImgB' : 'liveImgA';
+  var frontId = (front === 'A') ? 'liveImgA' : 'liveImgB';
+  var backImg = document.getElementById(backId);
+  var frontImg = document.getElementById(frontId);
+
+  if (!backImg) return;
+
+  backImg.onload = function () {
+    // Crossfade: show back, hide front
+    backImg.style.opacity = '1';
+    if (frontImg) frontImg.style.opacity = '0';
+
+    // Revoke old blob
+    if (window.__liveStreamOldBlobUrl) {
+      URL.revokeObjectURL(window.__liveStreamOldBlobUrl);
+    }
+    window.__liveStreamOldBlobUrl = url;
+
+    // Swap front
+    window.__liveStreamCurrentFront = (front === 'A') ? 'B' : 'A';
+
+    // Hide placeholder
+    var ph = document.getElementById('livePlaceholder');
+    if (ph) ph.style.display = 'none';
+  };
+
+  backImg.onerror = function () {
+    URL.revokeObjectURL(url);
+  };
+
+  backImg.src = url;
+}
+
+// ── Update metadata from stream headers ──────────────────────────────────
+function _updateMetadataFromStream(headers) {
+  var live = {
+    phase: headers['x-phase'] || 'running',
+    rawStep: headers['x-step'] ? Number(headers['x-step']) : null,
+    maxRawSteps: headers['x-total'] ? Number(headers['x-total']) : null,
+    countedUniqueScreens: headers['x-unique'] ? Number(headers['x-unique']) : null,
+    activity: headers['x-activity'] || '',
+    intentType: headers['x-intent'] || '',
+    latestAction: headers['x-action'] || '',
+    message: headers['x-message'] || '',
+  };
+  _updateLiveMetadata(live);
+
+  // Update LIVE badge
+  var badge = document.getElementById('liveBadge');
+  if (badge) {
+    badge.style.display = '';
+    if (live.phase === 'complete') {
+      badge.textContent = 'DONE';
+      badge.className = 'live-badge done';
+    } else if (live.phase === 'failed') {
+      badge.textContent = 'ENDED';
+      badge.className = 'live-badge error';
     } else {
-      img.dataset.phase = phase;
-    }
-
-    if ((phase === 'complete' || phase === 'failed') && !img.dataset.terminalPhase) {
-      img.dataset.terminalPhase = phase;
+      badge.textContent = 'LIVE';
+      badge.className = 'live-badge';
     }
   }
 }
 
-/* live bridge */
+// ── Main streaming function ──────────────────────────────────────────────
+async function startLiveStream(jobId) {
+  var controller = new AbortController();
+  window.__liveStreamController = controller;
+  window.__liveStreamCurrentFront = 'A';
+
+  var base = (typeof API_BASE !== 'undefined' && API_BASE) ? API_BASE : '';
+  var retryCount = 0;
+  var maxRetries = 3;
+
+  async function connect() {
+    try {
+      window.__liveStreamActive = true;
+
+      var response = await fetch(base + '/api/job-live-stream/' + encodeURIComponent(jobId), {
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+
+      if (!response.ok || !response.body || typeof response.body.getReader !== 'function') {
+        throw new Error('Stream not available');
+      }
+
+      retryCount = 0; // Successful connection resets retries
+      var reader = response.body.getReader();
+      var buffer = new Uint8Array(0);
+
+      // Show LIVE badge
+      var badge = document.getElementById('liveBadge');
+      if (badge) { badge.style.display = ''; badge.textContent = 'LIVE'; badge.className = 'live-badge'; }
+
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
+
+        buffer = _concatBufs(buffer, result.value);
+
+        // Extract all complete frames
+        var frame;
+        while ((frame = _extractFrame(buffer)) !== null) {
+          buffer = frame.remaining;
+
+          // Display PNG frames
+          if ((frame.headers['content-type'] || '').indexOf('image/png') !== -1 && frame.body.length > 0) {
+            _displayFrame(frame.body, frame.headers);
+          }
+
+          // Update metadata
+          _updateMetadataFromStream(frame.headers);
+
+          // Check for terminal phase
+          var phase = frame.headers['x-phase'] || '';
+          if (phase === 'complete' || phase === 'failed') {
+            window.__liveStreamActive = false;
+            try { reader.cancel(); } catch (e) {}
+            return;
+          }
+        }
+
+        // Safety: prevent buffer from growing unboundedly if parser gets stuck
+        if (buffer.length > 5 * 1024 * 1024) {
+          console.warn('Live stream buffer too large, resetting');
+          buffer = new Uint8Array(0);
+        }
+      }
+
+      // Stream ended naturally
+      window.__liveStreamActive = false;
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        window.__liveStreamActive = false;
+        return;
+      }
+
+      retryCount++;
+      if (retryCount <= maxRetries) {
+        console.warn('Live stream error, retrying (' + retryCount + '/' + maxRetries + '):', e.message);
+        var delay = Math.pow(2, retryCount) * 1000;
+        await new Promise(function (r) { setTimeout(r, delay); });
+        if (!controller.signal.aborted) {
+          return connect();
+        }
+        return;
+      }
+
+      // Give up — fall back to polling
+      console.warn('Live stream failed after retries, falling back to polling');
+      window.__liveStreamActive = false;
+      window.__liveStreamStarted = false;
+    }
+  }
+
+  connect();
+}
+
+// ── Live bridge (starts stream, fallback polling) ────────────────────────
 window.__liveBridgeInstalled = true;
 
 (function () {
-  const __origPollJobStatus =
+  var __origPollJobStatus =
     typeof pollJobStatus === 'function' ? pollJobStatus : null;
 
   if (__origPollJobStatus && !window.__pollJobStatusWrapped) {
-    pollJobStatus = async function(jobId) {
+    pollJobStatus = async function (jobId) {
       window.currentJobId = jobId;
+
+      // Start stream on first poll
+      if (!window.__liveStreamStarted && !window.__liveStreamActive) {
+        window.__liveStreamStarted = true;
+        startLiveStream(jobId);
+      }
+
       return __origPollJobStatus.apply(this, arguments);
     };
     window.__pollJobStatusWrapped = true;
   }
 
+  // Fallback polling — only active when stream is NOT running
   async function __fetchAndRenderLive() {
+    if (window.__liveStreamActive) return;
     try {
-      const jobId = window.currentJobId;
+      var jobId = window.currentJobId;
       if (!jobId) return;
       if (typeof renderLivePreview !== 'function') return;
       if (!document.getElementById('livePanel')) return;
 
-      const res = await fetch('/api/job-status/' + encodeURIComponent(jobId), {
-        cache: 'no-store'
+      var res = await fetch('/api/job-status/' + encodeURIComponent(jobId), {
+        cache: 'no-store',
       });
       if (!res.ok) return;
-
-      const data = await res.json();
+      var data = await res.json();
       if (data && data.live) {
         renderLivePreview(data.live, jobId);
       }
-    } catch (e) {
-      // keep silent; this is only a UI helper
-    }
+    } catch (e) {}
   }
-
-  __fetchAndRenderLive();
 
   if (!window.__liveBridgeTimer) {
     window.__liveBridgeTimer = setInterval(__fetchAndRenderLive, 3000);
@@ -1433,6 +1659,57 @@ setInterval(function () {
     100%{opacity:0;transform:translate(-50%,-50%) scale(1.55);}
   }
 
+  /* double-buffer images */
+  .live-buf{
+    position: absolute !important;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    display: block !important;
+    transition: opacity 200ms ease-in-out;
+  }
+  #liveImgA{ opacity: 0; z-index: 1; }
+  #liveImgB{ opacity: 0; z-index: 2; }
+
+  .live-placeholder{
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    font-size: 13px;
+    z-index: 0;
+  }
+
+  /* LIVE badge */
+  .live-badge{
+    position: absolute;
+    top: 8px; left: 8px;
+    z-index: 10;
+    background: #dc2626;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    animation: livePulse 1.5s infinite;
+  }
+  .live-badge.done{
+    background: #16a34a;
+    animation: none;
+  }
+  .live-badge.error{
+    background: #6b7280;
+    animation: none;
+  }
+  @keyframes livePulse{
+    0%,100%{ opacity: 1; }
+    50%{ opacity: 0.5; }
+  }
+
   @media (max-width: 1200px){
     #livePanel .live-panel-body{
       grid-template-columns: 220px 1fr !important;
@@ -1456,6 +1733,11 @@ setInterval(function () {
   function getPreviewNode(){
     const thumb = getThumb();
     if (!thumb) return null;
+    // Prefer the visible double-buffer image (opacity 1)
+    var imgA = document.getElementById("liveImgA");
+    var imgB = document.getElementById("liveImgB");
+    if (imgA && imgA.style.opacity === "1" && imgA.src) return imgA;
+    if (imgB && imgB.style.opacity === "1" && imgB.src) return imgB;
     return thumb.querySelector("img,video,canvas");
   }
 
@@ -1547,6 +1829,11 @@ setInterval(function () {
   document.addEventListener("DOMContentLoaded", keepEnhanced);
   setInterval(keepEnhanced, 500);
 })();
+
+// Abort stream on page unload
+window.addEventListener("beforeunload", function () {
+  if (typeof stopLiveStream === "function") stopLiveStream();
+});
 </script>
 
 </body>
